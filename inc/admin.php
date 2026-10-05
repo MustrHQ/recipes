@@ -5,6 +5,7 @@ function admin_head(string $title, string $active): void
     $nav = [
         'Kitchen' => [
             ['recipes', 'index.php', 'book', 'Recipes'],
+            ['labels', 'labels.php', 'printer', 'Labels'],
             ['brands', 'brands.php', 'tag', 'Brands'],
         ],
         'Content' => [

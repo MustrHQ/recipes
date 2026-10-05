@@ -25,6 +25,9 @@ const ALLERGENS = [
 ];
 const DIETS = ['vegan' => 'Vegan', 'vegetarian' => 'Vegetarian', 'halal' => 'Halal', 'gluten_free' => 'Gluten free'];
 
+/** What the first date on a label means. */
+const LABEL_KINDS = ['made' => 'Made', 'opened' => 'Opened', 'defrosted' => 'Defrosted'];
+
 // Some hosts ship without mbstring; these fallbacks keep things working.
 if (!function_exists('mb_substr')) {
     function mb_substr(string $s, int $start, ?int $len = null): string
@@ -268,6 +271,15 @@ function delete_upload(?string $name): void
     if ($name && preg_match('/^[\w.-]+$/', $name) && is_file(UPLOAD_DIR . '/' . $name)) @unlink(UPLOAD_DIR . '/' . $name);
 }
 
+/** Delete a photo only when no recipe, ingredient or step uses it any more (imports can share photos). */
+function delete_upload_if_unused(?string $name): void
+{
+    if (!$name) return;
+    $st = db()->prepare('SELECT (SELECT COUNT(*) FROM recipes WHERE image = ?) + (SELECT COUNT(*) FROM ingredients WHERE image = ?) + (SELECT COUNT(*) FROM steps WHERE image = ?)');
+    $st->execute([$name, $name, $name]);
+    if (!(int)$st->fetchColumn()) delete_upload($name);
+}
+
 /** One file out of a PHP multi-file field like $_FILES['ing_img'], by key. */
 function file_at(string $field, string|int $key): array
 {
@@ -320,6 +332,26 @@ function load_recipe(int $id, bool $publishedOnly = true): ?array
     $r['steps'] = $st->fetchAll();
     return $r;
 }
+
+/** Label size and printer defaults, clamped to what small thermal label printers handle. */
+function label_config(): array
+{
+    $w = max(25, min(80, (float)setting('label_w', '50')));
+    $h = max(20, min(80, (float)setting('label_h', '30')));
+    $lang = (string)setting('label_lang', 'tspl');
+    return [
+        'w' => $w, 'h' => $h,
+        'print_w' => max(20, min(72, (float)setting('label_print_w', '48'), $w)),
+        'gap' => max(0, min(10, (float)setting('label_gap', '2'))),
+        'dpi' => (int)setting('label_dpi', '203') === 300 ? 300 : 203,
+        'lang' => in_array($lang, ['tspl', 'escpos', 'browser'], true) ? $lang : 'tspl',
+        'show_allergens' => setting('label_allergens', '1') === '1',
+        'ask_initials' => setting('label_initials', '1') === '1',
+    ];
+}
+
+/** "3 days", "2 hours" */
+function fmt_shelf(int $v, string $unit): string { return plural($v, $unit === 'hours' ? 'hour' : 'day'); }
 
 /** Every picture a recipe uses (dish, ingredients, steps). */
 function recipe_images(array $r): array

@@ -7,6 +7,9 @@ $r = load_recipe((int)($_GET['id'] ?? 0), !is_admin());
 if (!$r || !$r['steps']) redirect(base_url($r ? 'recipe.php?id=' . (int)$r['id'] : ''));
 $n = count($r['steps']);
 $allergens = array_intersect_key(ALLERGENS, array_flip(csv_list($r['allergens'])));
+$st = db()->prepare('SELECT id FROM label_items WHERE recipe_id = ? AND active = 1 ORDER BY id LIMIT 1');
+$st->execute([(int)$r['id']]);
+$labelId = (int)$st->fetchColumn();
 
 page_head($r['name'] . ' step by step', 'cook');
 ?>
@@ -59,6 +62,7 @@ page_head($r['name'] . ' step by step', 'cook');
         <p style="font-size: 19px; opacity: .8; margin: 0 0 22px">That's every step for <?= e($r['name']) ?>.</p>
         <div class="frow">
           <button class="btn btn-big" type="button" data-go="0"><?= icon('restart') ?>Start again</button>
+          <?php if ($labelId): ?><a class="btn btn-big" href="labels.php?item=<?= $labelId ?>"><?= icon('printer') ?>Print label</a><?php endif; ?>
           <a class="btn btn-big btn-go" href="<?= e(base_url($r['brand_id'] ? '?brand=' . (int)$r['brand_id'] : '')) ?>"><?= icon('check') ?>Done, back to recipes</a>
         </div>
       </div>

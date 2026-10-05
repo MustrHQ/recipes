@@ -22,4 +22,13 @@ echo json_encode([
         ['src' => 'assets/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
         ['src' => 'assets/icons/maskable-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
     ],
+    'shortcuts' => [
+        ['name' => 'Recipes', 'url' => './?source=shortcut', 'icons' => [['src' => 'assets/icons/sc-recipes.png', 'sizes' => '96x96']]],
+        ['name' => 'Print a label', 'url' => './labels.php?source=shortcut', 'icons' => [['src' => 'assets/icons/sc-labels.png', 'sizes' => '96x96']]],
+    ],
+    'screenshots' => [
+        ['src' => 'assets/icons/screen-wide.webp', 'sizes' => '1280x800', 'type' => 'image/webp', 'form_factor' => 'wide', 'label' => 'Step by step on a kitchen tablet'],
+        ['src' => 'assets/icons/screen-narrow.webp', 'sizes' => '780x1688', 'type' => 'image/webp', 'form_factor' => 'narrow', 'label' => 'A recipe on a phone'],
+    ],
+    'launch_handler' => ['client_mode' => 'focus-existing'],
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);

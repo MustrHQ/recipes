@@ -6,8 +6,8 @@
 ![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4.svg)
 ![MySQL](https://img.shields.io/badge/MySQL-MariaDB-4479a1.svg)
 
-Recipe screens for kitchens: what you need, photos, and step-by-step guides on a tablet above
-the bench. Plain PHP and MySQL, with no framework, no Composer and no build step. Upload the
+Recipe screens and use-by labels for kitchens: what you need, photos, step-by-step guides, and
+labels printed straight from the tablet above the bench. Plain PHP and MySQL, with no framework, no Composer and no build step. Upload the
 folder to cPanel shared hosting and it runs.
 
 Part of the [MustrHQ](https://mustrhq.app) open-source set, alongside
@@ -36,6 +36,7 @@ the new starter on their first shift.
 | What you need | Every ingredient with its photo and amount. Batch buttons (½× to 4×) scale the amounts; tap to tick an ingredient off. |
 | Step by step | One step per screen with a big photo and big text. Back and Next, swipe, or the keyboard. Step timers with an alarm. Ends on the finished photo: "Check it matches the photo". |
 | Image preview | Tap any photo: full screen, swipe through every picture, double-tap to zoom. |
+| Labels | Pick an item, say when it was made, opened or defrosted, and print its use-by label on a Bluetooth label printer or through the print dialog. |
 
 The screens install as an app on tablets and phones, keep the screen awake while cooking, cache
 photos for weak kitchen wifi, and can sit behind an optional kitchen code.
@@ -45,6 +46,7 @@ photos for weak kitchen wifi, and can sit behind an optional kitchen code.
 | Page | What it is |
 |---|---|
 | Recipes | Add and edit recipes, with a photo for the dish, each ingredient and each step. Counts for live, hidden and missing photos. Copy, hide, delete. |
+| Labels | What can be labelled and for how long, the label size and the printer. |
 | Brands | Names, colours and order. |
 | Import and export | Recipe packs in and out, with a preview before anything changes, and a ChatGPT brief that writes packs for you. |
 | Updates and backups | Install a new release from its zip, with automatic backups and one-click restore. |
@@ -58,6 +60,13 @@ photos for weak kitchen wifi, and can sit behind an optional kitchen code.
   <tr>
     <td><img src="docs/screenshots/04-step-timer.png" alt="Step by step with a running timer"></td>
     <td><img src="docs/screenshots/05-image-preview.png" alt="Full-screen image preview"></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/14-labels.png" alt="The labels screen: items with their shelf life and a Print label button"></td>
+    <td><img src="docs/screenshots/15-printer.png" alt="Connecting a Bluetooth label printer"></td>
   </tr>
 </table>
 
@@ -87,8 +96,49 @@ one-click updates). Most cPanel hosts have all of these.
 
 ### On the kitchen tablets
 
-Open the main address on each tablet, enter the kitchen code if you set one, then use the
-browser's **Add to home screen** or **Install app**. It opens full screen like an app.
+Install the screens as an app on each tablet:
+
+- **Android:** open the address in Chrome and tap **Install app** in the top bar (or ⋮ → Install app).
+- **iPad:** open it in Safari, then Share → **Add to Home Screen**.
+
+The app opens full screen on the recipes, has a shortcut straight to **Labels**, keeps the screen
+awake during step by step, and keeps photos for when the kitchen wifi drops. Android's **App
+pinning** and iPad's **Guided Access** lock a tablet to it. Admin → Settings has the same guide.
+
+## Use-by labels
+
+<p align="center">
+  <img src="docs/screenshots/13-label.png" alt="Printing a use-by label: made time, initials, use-by date and the exact label preview" width="760">
+</p>
+
+**Admin → Labels** lists what your team labels: dishes, sauces, prepped veg, anything opened or
+defrosted. Each item has a shelf life in **days** or **hours**, a storage line and its allergens.
+Link an item to a recipe and the recipe gets a **Print label** button. **Add labels for every
+recipe** does that for all of them in one go.
+
+On the tablet, **Labels** shows every item with its shelf life. Tap **Print label**, choose *Now*,
+*Earlier today* or *Yesterday* (or any date and time), add your initials, and the screen shows the
+use-by date and the exact label before it prints.
+
+- **Days:** the day it was made counts as day 1. Made Monday with a 3-day life: use by Wednesday.
+- **Hours:** from the time it was made. Rice made at 11:40 with 2 hours: use by 13:40.
+- **Supplier's date:** for opened products you can ask for the date on the pack; the label uses
+  whichever is sooner.
+
+### Label printers
+
+Labels default to **50 × 30 mm, printed 48 mm wide at 203 dpi**, and are drawn at the printer's
+real resolution, so the preview is exactly what prints. Change the size in **Admin → Labels**.
+
+- **Bluetooth:** on the Labels screen tap the printer button → **Connect Bluetooth printer** → print
+  a test label. The tablet remembers the printer and reconnects by itself.
+- **Printers:** most Bluetooth thermal label printers speak **TSPL** (Xprinter, Munbyn, HPRT, iDPRT
+  and similar); receipt-style printers speak **ESC/POS**. If labels come out black or blank, tick
+  **Invert**.
+- **Browsers:** Bluetooth needs Chrome or Edge (Android, Windows, Mac, ChromeOS) and an `https://`
+  address. On iPad, labels print through the print dialog (AirPrint).
+- **Not supported:** printers that only work with their own app (Niimbot, Phomemo, Brother P-touch).
+  Use the print dialog with them where you can.
 
 ## Writing recipes
 
@@ -119,6 +169,24 @@ shared-hosting upload limits and load quickly on the tablets.
 To improve recipes you already have, export them, attach the export and the brief to ChatGPT, and
 ask it to improve them. Codes stay the same, so the import updates them instead of making copies.
 
+### Moving from MustrHQ Station
+
+Station's recipe export and its ChatGPT `mustrhq-pack.zip` import here as they are, with every
+recipe and picture:
+
+- recipes go to their brand by code, and brand colours come across;
+- ready items become ingredients, with their pictures (`component__p01.png`);
+- picture file names such as `katsu-and-co__k01__preview.png` and `__step3.png` are placed on the
+  dish and the right step;
+- `recipes-part1.json`, `recipes-part2.json`… in one zip are merged;
+- quantities like "1 cutlet (180 g raw)" are split into amount, unit and note;
+- Station's packing, quality and chef notes and the utensils go into the recipe note.
+
+Big packs are fine. The file is sent to the server in parts, so it can be larger than your
+hosting's upload limit, and the import runs a few recipes at a time with a progress bar. A picture
+shared by many recipes is stored once. Importing again updates the same recipes instead of copying
+them.
+
 **Always check the allergens yourself before a recipe goes live.** The format is documented in
 [docs/recipe-pack.md](docs/recipe-pack.md).
 
@@ -128,7 +196,9 @@ ask it to improve them. Codes stay the same, so the import updates them instead 
 
 ## Updating
 
-**Admin → Updates and backups → upload the new release zip.** You see what will change, then:
+**Admin → Updates and backups.** Press **Check now** to ask GitHub for a newer version and
+download it there and then, or upload the release zip yourself. Either way you see what will
+change, then:
 
 1. the current app files and the database are backed up,
 2. the new files are written (if anything fails, the old version is put straight back),
@@ -147,6 +217,7 @@ upgrades itself on the next page load.
 index.php            recipe library
 recipe.php           recipe page
 cook.php             step-by-step mode
+labels.php           use-by labels
 unlock.php           kitchen code screen
 install.php          installer (deleted after use)
 manifest.php, sw.php installable app and photo caching
@@ -170,6 +241,7 @@ tests/smoke.sh       installs into a fresh database and loads every screen
 - Photos are checked as real images and renamed; `uploads/` refuses to run scripts. `config.php`,
   `inc/` and `backups/` are not served.
 - Updates are read as data, checked for unsafe paths and backed up before anything is written.
+- The app only connects to the internet when an admin presses **Check now** for updates.
 
 Please serve it over HTTPS (free with AutoSSL in cPanel). Report security problems privately:
 see [SECURITY.md](SECURITY.md).

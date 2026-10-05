@@ -62,11 +62,21 @@ function install_demo(PDO $pdo): void
     $ri = $pdo->prepare('INSERT INTO recipes (brand_id, code, name, description, yield_text, prep_minutes, cook_minutes, allergens, diets, notes, image) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
     $ii = $pdo->prepare('INSERT INTO ingredients (recipe_id, sort, name, qty, unit, note, image) VALUES (?,?,?,?,?,?,?)');
     $si = $pdo->prepare('INSERT INTO steps (recipe_id, sort, title, body, tip, timer_seconds, image) VALUES (?,?,?,?,?,?,?)');
+    $ids = [];
     foreach ($recipes as $r) {
         $key = strtolower($r['code']);
         $ri->execute([$brand, $r['code'], $r['name'], $r['description'], $r['yield'], $r['prep'], $r['cook'], $r['allergens'], $r['diets'], $r['notes'], $photo("$key-dish")]);
         $rid = (int)$pdo->lastInsertId();
+        $ids[$r['code']] = $rid;
         foreach ($r['ing'] as $n => $i) $ii->execute([$rid, $n, $i[0], $i[1], $i[2], $i[3], $photo("$key-ing-" . ($n + 1))]);
         foreach ($r['steps'] as $n => $s) $si->execute([$rid, $n, $s[0], $s[1], $s[2], $s[3], $photo("$key-step-" . ($n + 1))]);
     }
+
+    // Label items: the bowl itself, and the prepped things the team labels during the day.
+    $li = $pdo->prepare('INSERT INTO label_items (brand_id, recipe_id, name, kind, shelf_value, shelf_unit, storage, allergens, ask_supplier, sort) VALUES (?,?,?,?,?,?,?,?,?,?)');
+    $li->execute([$brand, $ids['D01'] ?? null, 'Chicken katsu rice bowl', 'made', 1, 'days', 'Chilled 0–5 °C', '', 0, 1]);
+    $li->execute([$brand, null, 'Cooked sushi rice', 'made', 2, 'hours', 'Hot-held above 63 °C', '', 0, 2]);
+    $li->execute([$brand, null, 'Katsu sauce', 'made', 3, 'days', 'Chilled 0–5 °C', 'gluten,celery,soya', 0, 3]);
+    $li->execute([$brand, null, 'Pickled red cabbage', 'opened', 5, 'days', 'Chilled once opened', 'sulphites', 1, 4]);
+    $li->execute([$brand, null, 'Breaded chicken thigh', 'defrosted', 2, 'days', 'Chilled 0–5 °C', 'gluten,eggs', 0, 5]);
 }

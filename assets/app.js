@@ -238,14 +238,120 @@
     if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
     var t = e.target.tagName;
     if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || e.target.isContentEditable) return;
-    var s = $('[data-live-search]');
+    var s = $('[data-live-search], [data-label-search]');
     if (s) { e.preventDefault(); s.focus(); s.select(); }
   });
+
+  // "Install app" button, where the browser offers it (Chrome and Edge on Android and desktop).
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferred = e;
+    $$('[data-install]').forEach(function (b) { b.hidden = false; });
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-install]');
+    if (!b || !deferred) return;
+    deferred.prompt();
+    deferred.userChoice.then(function () { deferred = null; $$('[data-install]').forEach(function (x) { x.hidden = true; }); });
+  });
+  if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.documentElement.classList.add('in-app');
 
   // Installable app: register the service worker (it only caches static files).
   if ('serviceWorker' in navigator && document.querySelector('link[rel=manifest]')) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register(document.body.getAttribute('data-base') + 'sw.php').catch(function () {});
+    });
+  }
+
+  /* ---------- Admin: big recipe packs (upload in parts, import in batches) ---------- */
+  var post = function (url, fd) {
+    return fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) {
+      return r.json().catch(function () { throw new Error('The server sent an unexpected reply (' + r.status + '). Try again.'); })
+        .then(function (j) { if (!r.ok || j.error) throw new Error(j.error || 'Something went wrong (' + r.status + ').'); return j; });
+    });
+  };
+  var progress = function (form, frac, text) {
+    var p = $('[data-progress]', form); if (!p) return;
+    p.hidden = false; $('.bar i', p).style.width = Math.round(frac * 100) + '%'; $('p', p).textContent = text;
+  };
+  var lock = function (form, on) { $$('button', form).forEach(function (b) { b.disabled = on; }); };
+
+  var up = $('form[data-chunked]');
+  if (up && window.fetch && window.FormData && Blob.prototype.slice) {
+    up.addEventListener('submit', function (e) {
+      var file = up.elements.pack.files[0]; if (!file) return;
+      e.preventDefault();
+      var size = parseInt(up.getAttribute('data-chunk'), 10), total = Math.max(1, Math.ceil(file.size / size)), i = 0;
+      var id = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+      lock(up, true);
+      var mb = function (n) { return (n / 1048576).toFixed(1) + ' MB'; };
+      var next = function () {
+        var fd = new FormData();
+        fd.append('csrf', up.elements.csrf.value); fd.append('action', 'chunk'); fd.append('upload_id', id);
+        fd.append('index', i); fd.append('total', total); fd.append('name', file.name);
+        fd.append('chunk', file.slice(i * size, (i + 1) * size), 'part');
+        progress(up, i / total, 'Sending ' + mb(Math.min(file.size, i * size)) + ' of ' + mb(file.size) + '…');
+        return post(up.getAttribute('data-api'), fd).then(function (j) {
+          i++;
+          if (j.done) { progress(up, 1, 'Checking the pack…'); location.href = j.next; return; }
+          return next();
+        });
+      };
+      next().catch(function (err) { lock(up, false); progress(up, 0, ''); alert(err.message); });
+    });
+  }
+
+  var ap = $('form[data-batch-apply]');
+  if (ap && window.fetch && window.FormData) {
+    ap.addEventListener('submit', function (e) {
+      var btn = e.submitter;
+      if (!btn || btn.value !== 'apply') return;
+      e.preventDefault();
+      var fd = new FormData(ap); fd.set('action', 'apply_start');
+      var api = ap.getAttribute('data-api');
+      lock(ap, true);
+      post(api, fd).then(function (j) {
+        var total = j.total;
+        progress(ap, 0, 'Importing 0 of ' + total + ' recipes…');
+        var step = function () {
+          var f2 = new FormData(); f2.append('csrf', ap.elements.csrf.value); f2.append('action', 'apply_next');
+          return post(api, f2).then(function (r) {
+            progress(ap, r.pos / r.total, 'Imported ' + r.pos + ' of ' + r.total + ' recipes, ' + r.photos + ' photos so far…');
+            if (r.done) { location.href = r.next; return; }
+            return step();
+          });
+        };
+        return step();
+      }).catch(function (err) { lock(ap, false); alert(err.message); });
+    });
+  }
+
+  /* ---------- Admin: label sample and label editor ---------- */
+  var sample = $('[data-label-preview]');
+  if (sample) {
+    var form = sample.closest('form');
+    var drawSample = function () {
+      if (!window.MustrPrinter) return;
+      var v = function (n) { return parseFloat(form.elements[n].value) || 0; };
+      var cfg = { w: v('label_w'), h: v('label_h'), print_w: Math.min(v('label_print_w'), v('label_w')), gap: v('label_gap'), dpi: +form.elements.label_dpi.value };
+      if (cfg.w < 20 || cfg.h < 15 || cfg.print_w < 15) return;
+      var rows = [['Made', 'Mon 05/10 09:30  SH']];
+      if (form.elements.label_allergens.checked) rows.push(['Allergens', 'Gluten, Eggs, Soya']);
+      rows.push(['Keep', 'Chilled 0–5 °C']);
+      window.MustrPrinter.render({ brand: (document.querySelector('.side .mark > span:last-child').firstChild.textContent || 'Kitchen').trim(), title: 'Golden curry sauce', rows: rows, useBy: 'Wed 07/10', useByTime: '' }, cfg)
+        .then(function (cv) { sample.querySelector('img').src = cv.toDataURL('image/png'); sample.style.aspectRatio = cfg.w + ' / ' + cfg.h; });
+    };
+    form.addEventListener('input', drawSample);
+    form.addEventListener('change', drawSample);
+    window.addEventListener('load', drawSample);
+  }
+  var linkSel = $('[data-label-editor] select[name=recipe_id]');
+  if (linkSel) {
+    linkSel.addEventListener('change', function () {
+      var o = linkSel.selectedOptions[0], f = linkSel.form;
+      if (!o || !o.value) return;
+      if (!f.elements.name.value) f.elements.name.value = o.getAttribute('data-name');
+      if (o.getAttribute('data-brand') !== '0') f.elements.brand_id.value = o.getAttribute('data-brand');
     });
   }
 

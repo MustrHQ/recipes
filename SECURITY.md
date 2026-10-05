@@ -7,7 +7,8 @@ Admin → Updates and backups makes that a one-file upload.
 
 | Version | Supported |
 |---|---|
-| 1.0.x | Yes |
+| 1.1.x | Yes |
+| 1.0.x | Security fixes until 1.2 |
 | Older | No, please update |
 
 ## Reporting a vulnerability
@@ -45,7 +46,8 @@ hosting.
 - Uploaded photos are checked as real images and renamed; the `uploads` folder refuses to run
   scripts. `config.php`, `inc/` and `backups/` are not served.
 - Updates are read from the zip as data, checked for unsafe paths, backed up first, and rolled
-  back if writing fails.
+  back if writing fails. Downloads from GitHub are only accepted from this repository's releases.
+- The app makes no outgoing connections except when an admin presses **Check now** for updates.
 
 ## What you should do
 

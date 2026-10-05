@@ -84,6 +84,22 @@ admin_head('Settings', 'settings');
   </section>
 
   <section class="card">
+    <h2>Kitchen tablets</h2>
+    <p class="help">Install the recipe screens as an app on each tablet. It opens full screen, starts on the recipes, has a shortcut to labels, and keeps photos for when the wifi drops.</p>
+    <div class="howto-grid">
+      <div><h3>Android tablet</h3><ol>
+        <li>Open <code><?= e((isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '') . base_url()) ?></code> in Chrome.</li>
+        <li>Tap <strong>Install app</strong> in the top bar, or the ⋮ menu → <strong>Install app</strong>.</li>
+        <li>For Bluetooth label printing, open <strong>Labels</strong> → printer button → <strong>Connect</strong>.</li></ol></div>
+      <div><h3>iPad</h3><ol>
+        <li>Open the same address in Safari.</li>
+        <li>Tap Share → <strong>Add to Home Screen</strong>.</li>
+        <li>Labels print through AirPrint, because Safari has no Bluetooth for websites.</li></ol></div>
+    </div>
+    <p class="help small">Tip: Android's <strong>App pinning</strong> and iPad's <strong>Guided Access</strong> lock a tablet to this app. The site needs <code>https://</code> for install and Bluetooth.</p>
+  </section>
+
+  <section class="card">
     <h2>This installation</h2>
     <p class="help">Useful when you ask for help or report a problem.</p>
     <div class="facts">

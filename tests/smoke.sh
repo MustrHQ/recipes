@@ -27,6 +27,8 @@ has "What you need" "$BASE/recipe.php?id=1" || fail "recipe page"
 has "data-cook" "$BASE/cook.php?id=1" || fail "step-by-step page"
 has '"start_url"' "$BASE/manifest.php" || fail "manifest"
 has "mustr-recipes-" "$BASE/sw.php" || fail "service worker"
+has "Print label" "$BASE/labels.php" || fail "labels screen"
+has "labels.php?item=" "$BASE/recipe.php?id=1" || fail "Print label button on the recipe"
 CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/recipe.php?id=999")
 [ "$CODE" = "404" ] || fail "missing recipe should be 404, got $CODE"
 
@@ -34,7 +36,7 @@ echo "3. Admin sign-in"
 CSRF=$(curl -sf -c "$JAR" -b "$JAR" "$BASE/admin/login.php" | token)
 curl -sf -c "$JAR" -b "$JAR" -o /dev/null "$BASE/admin/login.php" \
   --data-urlencode "csrf=$CSRF" --data-urlencode "email=test@example.com" --data-urlencode "password=correct-horse"
-for page in "" recipe-edit.php?id=1 brands.php transfer.php update.php settings.php; do
+for page in "" recipe-edit.php?id=1 labels.php labels.php?new=1 brands.php transfer.php update.php settings.php; do
   has 'class="side"' -b "$JAR" "$BASE/admin/$page" || fail "admin/$page"
 done
 

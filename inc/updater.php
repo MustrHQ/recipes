@@ -251,3 +251,64 @@ function upd_tidy(): void
     foreach (glob(upd_dir() . '/incoming-*.zip') ?: [] as $f) if (filemtime($f) < time() - 86400) @unlink($f);
     foreach (glob(upd_dir() . '/import-*.zip') ?: [] as $f) if (filemtime($f) < time() - 86400) @unlink($f);
 }
+
+/* ---------- Checking GitHub for a new release (only when an admin asks) ---------- */
+
+const UPD_REPO = 'MustrHQ/recipes';
+
+/** GET a URL over HTTPS. Returns [status, body]. Uses cURL, or PHP streams when cURL is missing. */
+function upd_http_get(string $url, int $timeout = 20, ?string $saveTo = null): array
+{
+    $ua = 'MustrHQ-Recipes/' . MUSTR_VERSION . ' (+https://github.com/' . UPD_REPO . ')';
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        $fh = $saveTo ? fopen($saveTo, 'wb') : null;
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 5, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_USERAGENT => $ua, CURLOPT_HTTPHEADER => ['Accept: application/vnd.github+json, application/octet-stream'],
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS, CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        ]);
+        if ($fh) curl_setopt($ch, CURLOPT_FILE, $fh); else curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $body = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($fh) fclose($fh);
+        if ($body === false) throw new RuntimeException('Could not reach GitHub (' . $err . '). Your host may block outgoing connections; download the zip yourself instead.');
+        return [$code, $fh ? '' : (string)$body];
+    }
+    if (!ini_get('allow_url_fopen')) throw new RuntimeException('This server cannot make outgoing connections (no cURL, allow_url_fopen off). Download the zip yourself instead.');
+    $ctx = stream_context_create(['http' => ['timeout' => $timeout, 'user_agent' => $ua, 'follow_location' => 1, 'ignore_errors' => true]]);
+    $body = @file_get_contents($url, false, $ctx);
+    if ($body === false) throw new RuntimeException('Could not reach GitHub. Download the zip yourself instead.');
+    preg_match('#HTTP/\S+\s+(\d{3})#', implode("\n", array_reverse($http_response_header ?? [])), $m);
+    if ($saveTo) file_put_contents($saveTo, $body);
+    return [(int)($m[1] ?? 200), $saveTo ? '' : $body];
+}
+
+/** The latest published release: ['version', 'url' (zip), 'notes', 'page'] or throws. */
+function upd_latest_release(): array
+{
+    [$code, $body] = upd_http_get('https://api.github.com/repos/' . UPD_REPO . '/releases/latest', 15);
+    if ($code === 404) throw new RuntimeException('No releases are published on GitHub yet.');
+    if ($code === 403) throw new RuntimeException('GitHub is limiting requests from your server right now. Try again in an hour, or download the zip yourself.');
+    $j = json_decode($body, true);
+    if ($code !== 200 || !is_array($j) || empty($j['tag_name'])) throw new RuntimeException('GitHub sent an unexpected reply (' . $code . ').');
+    $version = ltrim((string)$j['tag_name'], 'vV');
+    $url = null;
+    foreach ((array)($j['assets'] ?? []) as $a) {
+        if (preg_match('/^mustrhq-recipes-[0-9][0-9A-Za-z.\-]*\.zip$/', (string)($a['name'] ?? ''))) { $url = (string)$a['browser_download_url']; break; }
+    }
+    return ['version' => $version, 'url' => $url, 'notes' => (string)($j['body'] ?? ''), 'page' => (string)($j['html_url'] ?? '')];
+}
+
+/** Download a release zip from GitHub into backups/. Returns the local path. */
+function upd_download_release(string $url, string $dest): string
+{
+    if (!preg_match('#^https://github\.com/' . preg_quote(UPD_REPO, '#') . '/releases/download/[^/]+/mustrhq-recipes-[0-9][0-9A-Za-z.\-]*\.zip$#', $url)) {
+        throw new RuntimeException('That download address is not a MustrHQ Recipes release.');
+    }
+    [$code] = upd_http_get($url, 120, $dest);
+    if ($code !== 200 || !is_file($dest) || filesize($dest) < 1000) { @unlink($dest); throw new RuntimeException('The download from GitHub did not complete (' . $code . '). Try again, or download the zip yourself.'); }
+    return $dest;
+}

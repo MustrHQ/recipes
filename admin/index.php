@@ -15,9 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $r = load_recipe($id, false);
         if ($r) {
             db()->prepare('DELETE FROM recipes WHERE id = ?')->execute([$id]);
-            delete_upload($r['image']);
-            foreach ($r['ingredients'] as $i) delete_upload($i['image']);
-            foreach ($r['steps'] as $s) delete_upload($s['image']);
+            foreach (array_unique(recipe_images($r)) as $f) delete_upload_if_unused($f);
             flash('Deleted "' . $r['name'] . '".');
         }
     } elseif ($act === 'duplicate') {

@@ -108,6 +108,7 @@ if ($pending) {
         $pack = pack_read($dir . '/' . $pending['file'], $pending['file']);
         $plan = pack_plan($pack);
         $plan['problems'] = $pack['problems'];
+        $plan['notes'] = $pack['notes'];
         $plan['image_count'] = count($pack['images']);
     } catch (Throwable $e) {
         $readError = $e->getMessage();
@@ -116,6 +117,7 @@ if ($pending) {
     }
 }
 $canZip = upd_can_zip();
+$chunk = max(512 * 1024, min(8 * 1048576, min(ini_bytes('upload_max_filesize') ?: PHP_INT_MAX, ini_bytes('post_max_size') ?: PHP_INT_MAX) - 256 * 1024));
 
 admin_head('Import and export', 'transfer');
 ?>
@@ -123,7 +125,7 @@ admin_head('Import and export', 'transfer');
 <?php if ($readError): ?><div class="alert bad"><?= e($readError) ?></div><?php endif; ?>
 
 <?php if ($plan): ?>
-<form method="post" class="card" id="preview" aria-labelledby="pvH">
+<form method="post" class="card" id="preview" aria-labelledby="pvH" data-batch-apply data-api="<?= e(base_url('admin/transfer-api.php')) ?>">
   <?= csrf_field() ?>
   <div class="card-h">
     <div>
@@ -131,6 +133,15 @@ admin_head('Import and export', 'transfer');
       <p class="help">From <?= e($pending['name']) ?>: <?= plural(count($plan['rows']), 'recipe') ?>, <?= plural($plan['image_count'], 'photo') ?>. Nothing changes until you press Import.</p>
     </div>
   </div>
+  <?php $nNew = count(array_filter($plan['rows'], fn($r) => $r['action'] === 'new')); $nWarn = count(array_filter($plan['rows'], fn($r) => $r['warnings'])); ?>
+  <div class="facts" style="margin-bottom: 14px">
+    <div><span>New recipes</span><strong><?= $nNew ?></strong></div>
+    <div><span>Replace existing</span><strong><?= count($plan['rows']) - $nNew ?></strong></div>
+    <div><span>Pictures matched</span><strong><?= (int)$plan['photos'] ?></strong></div>
+    <?php if ($plan['photos_missing']): ?><div><span>Pictures missing</span><strong><?= (int)$plan['photos_missing'] ?></strong></div><?php endif; ?>
+    <div><span>To check</span><strong><?= $nWarn ?></strong></div>
+  </div>
+  <?php foreach ($plan['notes'] as $nt): ?><div class="alert warn"><?= e($nt) ?></div><?php endforeach; ?>
   <?php if ($plan['new_brands']): ?><div class="alert ok">New brands will be added: <?= e(implode(', ', $plan['new_brands'])) ?>.</div><?php endif; ?>
   <?php foreach ($plan['problems'] as $p): ?><div class="alert bad"><?= e($p) ?></div><?php endforeach; ?>
   <div class="scroll-x">
@@ -151,6 +162,7 @@ admin_head('Import and export', 'transfer');
   </table>
   </div>
   <p class="help small" style="margin-top: 12px">"Replaces existing" matches on brand and code (or name, when there is no code). Its ingredients and steps are replaced by the ones in the pack; photos not in the pack stay as they are.</p>
+  <div class="progress" data-progress hidden><div class="bar"><i></i></div><p class="small" aria-live="polite"></p></div>
   <div class="btnrow">
     <button class="btn btn-go btn-big" name="action" value="apply"><?= icon('upload') ?>Import ticked recipes</button>
     <button class="btn btn-ghost" name="action" value="cancel" formnovalidate>Cancel</button>
@@ -183,12 +195,13 @@ admin_head('Import and export', 'transfer');
     <div class="intro">
       <h2 id="g2">Import a recipe pack</h2>
       <p class="help">A zip with <code>recipes.json</code> and its photos, or just <code>recipes.json</code>. You see every recipe and any problems before anything is saved.</p>
-      <p class="help small">Largest upload your server accepts: <?= e(human_bytes(min(ini_bytes('upload_max_filesize'), ini_bytes('post_max_size')))) ?>. Split big packs by brand.</p>
+      <p class="help small"><strong>Moving from MustrHQ Station?</strong> Its export and its ChatGPT <code>mustrhq-pack.zip</code> import here as they are, with every recipe and picture. Big packs are fine: the file is sent in parts and imported a few recipes at a time.</p>
     </div>
     <?php if (!$canZip): ?><div class="alert bad">This server cannot open zip files, so only recipes.json can be imported. Ask your host to turn on the "zip" PHP extension.</div><?php endif; ?>
-    <form method="post" enctype="multipart/form-data" class="form tight">
+    <form method="post" enctype="multipart/form-data" class="form tight" data-chunked data-api="<?= e(base_url('admin/transfer-api.php')) ?>" data-chunk="<?= (int)$chunk ?>">
       <?= csrf_field() ?><input type="hidden" name="action" value="upload">
       <div class="f"><label for="pack">Recipe pack</label><input class="in" type="file" id="pack" name="pack" accept=".zip,.json,application/zip,application/json" required></div>
+      <div class="progress" data-progress hidden><div class="bar"><i></i></div><p class="small" aria-live="polite"></p></div>
       <div><button class="btn btn-primary" type="submit"><?= icon('upload') ?>Check the pack</button></div>
     </form>
   </section>

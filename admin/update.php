@@ -67,6 +67,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'check') {
+        try {
+            $rel = upd_latest_release();
+            $_SESSION['upd_latest'] = $rel + ['checked' => time()];
+            flash(version_compare($rel['version'], MUSTR_VERSION, '>') ? 'Version ' . $rel['version'] . ' is available.' : 'You have the latest version (' . MUSTR_VERSION . ').');
+        } catch (Throwable $e) {
+            flash($e->getMessage(), 'bad');
+        }
+        redirect($self);
+    }
+
+    if ($action === 'fetch') {
+        $rel = $_SESSION['upd_latest'] ?? null;
+        if (!$rel || empty($rel['url'])) { flash('Check for a new version first.', 'bad'); redirect($self); }
+        $token = bin2hex(random_bytes(8));
+        $dest = $dir . '/incoming-' . $token . '.zip';
+        try {
+            upd_download_release($rel['url'], $dest);
+            $preview = upd_inspect($dest);
+            $preview['token'] = $token;
+            $preview['file'] = basename($rel['url']) . ' (from GitHub)';
+            $_SESSION['upd_token'] = $token;
+        } catch (Throwable $e) {
+            @unlink($dest);
+            flash($e->getMessage(), 'bad');
+            redirect($self);
+        }
+    }
+
     if ($action === 'apply') {
         $token = (string)($_POST['token'] ?? '');
         if (!preg_match('/^[a-f0-9]{16}$/', $token) || $token !== ($_SESSION['upd_token'] ?? '')) {
@@ -169,6 +198,22 @@ admin_head('Updates and backups', 'update');
     <?php elseif (!$writable): ?>
       <div class="alert bad">The app folder or the backups folder is not writable, so updates can't be installed from here. Set both to permission 755.</div>
     <?php else: ?>
+      <?php $latest = $_SESSION['upd_latest'] ?? null; ?>
+      <div class="gh-check">
+        <?php if ($latest && version_compare($latest['version'], MUSTR_VERSION, '>')): ?>
+          <div>
+            <strong>Version <?= e($latest['version']) ?> is available.</strong>
+            <?php if ($latest['page']): ?><a href="<?= e($latest['page']) ?>" target="_blank" rel="noopener">What's new</a><?php endif; ?>
+          </div>
+          <?php if ($latest['url']): ?>
+          <form method="post"><?= csrf_field() ?><button class="btn btn-go" name="action" value="fetch"><?= icon('download') ?>Download <?= e($latest['version']) ?> and check it</button></form>
+          <?php else: ?><span class="muted small">That release has no zip attached yet. Try again later.</span><?php endif; ?>
+        <?php else: ?>
+          <div><strong>Check GitHub for a new version</strong><span class="muted small"><?= $latest ? 'Last checked ' . e(date('j M, H:i', $latest['checked'])) . ': you are up to date.' : 'Only when you press the button. Nothing is sent about your kitchen.' ?></span></div>
+          <form method="post"><?= csrf_field() ?><button class="btn" name="action" value="check"><?= icon('refresh') ?>Check now</button></form>
+        <?php endif; ?>
+      </div>
+      <p class="or-line"><span>or upload the zip yourself</span></p>
       <form method="post" enctype="multipart/form-data" class="btnrow">
         <?= csrf_field() ?><input type="hidden" name="action" value="inspect">
         <label class="sr" for="release">Release zip</label>

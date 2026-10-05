@@ -12,7 +12,7 @@ header('Content-Type: application/javascript; charset=utf-8');
 header('Cache-Control: no-cache');
 header('Service-Worker-Allowed: ./');
 $v = preg_replace('/[^0-9A-Za-z.\-]/', '', MUSTR_VERSION);
-$shell = ['assets/app.css', 'assets/app.js', 'assets/fonts/archivo-var.woff2', 'assets/icons/icon-192.png', 'assets/icons/favicon-32.png', 'offline.html'];
+$shell = ['assets/app.css', 'assets/app.js', 'assets/printer.js', 'assets/labels.js', 'assets/fonts/archivo-var.woff2', 'assets/icons/icon-192.png', 'assets/icons/favicon-32.png', 'offline.html'];
 ?>
 'use strict';
 const CACHE = 'mustr-recipes-<?= $v ?>';

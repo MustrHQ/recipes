@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($r) {
         $old = array_merge([$r['image']], array_column($r['ingredients'], 'image'), array_column($r['steps'], 'image'));
         $now = array_merge([$mainImage], array_column($ings, 4), array_column($steps, 4));
-        foreach (array_diff(array_filter($old), array_filter($now)) as $gone) delete_upload($gone);
+        foreach (array_diff(array_filter($old), array_filter($now)) as $gone) delete_upload_if_unused($gone);
     }
 
     flash($warnings ? 'Saved, but some photos were skipped. ' . implode(' ', $warnings) : 'Saved "' . $name . '".', $warnings ? 'bad' : 'ok');

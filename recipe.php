@@ -9,6 +9,9 @@ if (!$r) not_found('This recipe is not available', 'It may have been removed or 
 $allergens = array_intersect_key(ALLERGENS, array_flip(csv_list($r['allergens'])));
 $diets = array_intersect_key(DIETS, array_flip(csv_list($r['diets'])));
 $total = (int)$r['prep_minutes'] + (int)$r['cook_minutes'];
+$st = db()->prepare('SELECT id FROM label_items WHERE recipe_id = ? AND active = 1 ORDER BY id LIMIT 1');
+$st->execute([(int)$r['id']]);
+$labelId = (int)$st->fetchColumn();
 
 page_head($r['name']);
 kitchen_top();
@@ -50,7 +53,8 @@ kitchen_top();
         <?php if ($r['steps']): ?>
           <a class="btn btn-go btn-big" href="cook.php?id=<?= (int)$r['id'] ?>"><?= icon('play') ?>Start step by step</a>
         <?php endif; ?>
-        <button class="btn btn-big" type="button" data-print><?= icon('print') ?>Print</button>
+        <?php if ($labelId): ?><a class="btn btn-big" href="labels.php?item=<?= $labelId ?>"><?= icon('printer') ?>Print label</a><?php endif; ?>
+        <button class="btn btn-big btn-ghost" type="button" data-print><?= icon('print') ?>Print recipe</button>
         <?php if (is_admin()): ?><a class="btn btn-big btn-ghost" href="<?= e(base_url('admin/recipe-edit.php?id=' . (int)$r['id'])) ?>">Edit</a><?php endif; ?>
       </div>
     </div>

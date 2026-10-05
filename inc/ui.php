@@ -30,6 +30,10 @@ function icon(string $name): string
         'alert' => '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
         'copy' => '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
         'swap' => '<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>',
+        'printer' => '<path d="M6 9V3h12v6M6 18H4v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/>',
+        'bluetooth' => '<path d="m7 7 10 10-5 5V2l5 5L7 17"/>',
+        'minus' => '<path d="M5 12h14"/>',
+        'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
         'print' => '<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2"/><rect x="6" y="14" width="12" height="7"/>',
     ][$name] ?? '';
     $fill = $name === 'play' ? 'currentColor' : 'none';
@@ -84,15 +88,28 @@ function page_head(string $title, string $bodyClass = '', bool $app = true): voi
 <?php
 }
 
-function kitchen_top(): void
+function kitchen_top(string $active = 'recipes', string $tools = ''): void
 {
+    static $hasLabels = null;
+    if ($hasLabels === null) {
+        try { $hasLabels = (bool)db()->query('SELECT 1 FROM label_items WHERE active = 1 LIMIT 1')->fetchColumn(); }
+        catch (Throwable $t) { $hasLabels = false; }
+    }
     ?>
 <header class="top">
   <a class="mark" href="<?= e(base_url()) ?>">
     <span class="mark-box"><?= mark_svg() ?></span>
-    <span><?= e(kitchen_name()) ?><small>Recipes</small></span>
+    <span><?= e(kitchen_name()) ?><small><?= $active === 'labels' ? 'Labels' : 'Recipes' ?></small></span>
   </a>
+  <?php if ($hasLabels || $active === 'labels'): ?>
+  <nav class="tabs" aria-label="Kitchen screens">
+    <a href="<?= e(base_url()) ?>" <?= $active === 'recipes' ? 'aria-current="page"' : '' ?>><?= icon('book') ?><span>Recipes</span></a>
+    <a href="<?= e(base_url('labels.php')) ?>" <?= $active === 'labels' ? 'aria-current="page"' : '' ?>><?= icon('tag') ?><span>Labels</span></a>
+  </nav>
+  <?php endif; ?>
   <span class="spacer"></span>
+  <?= $tools ?>
+  <button class="btn install-btn" type="button" data-install hidden><?= icon('download') ?><span>Install app</span></button>
   <?php if (is_admin()): ?>
     <a class="btn" href="<?= e(base_url('admin/')) ?>"><?= icon('cog') ?><span>Admin</span></a>
   <?php endif; ?>

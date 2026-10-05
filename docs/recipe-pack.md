@@ -87,3 +87,23 @@ changes nothing.
 Exports use the same format, with photo files named
 `<brand>__<code>__dish.jpg`, `__ing-1`, `__step-1` and so on. An export imports back unchanged,
 so it doubles as a portable backup and a way to copy recipes to another kitchen.
+
+## MustrHQ Station packs
+
+Packs from MustrHQ Station (`"format": "mustrhq-recipe-pack"`) import directly. The importer reads:
+
+| Station field | Becomes |
+|---|---|
+| `brands[].colour` | the brand colour, for new brands |
+| `recipes[].preview_image`, or `<brand>__<code>__preview.png` | the finished-dish photo |
+| `steps[].image`, or `<brand>__<code>__step<N>.png` | the photo for step N |
+| `ingredients[].component` + `components[].image`, or `component__<code>.png` | the ingredient photo |
+| `ingredients[].qty` such as `"1 cutlet (180 g raw)"` | amount `1`, unit `cutlet`, note `(180 g raw)` |
+| `halal`, `vegetarian`, `vegan` | diet tags |
+| `minutes_per_portion` | cook time, and makes "1 portion" |
+| `qc_note`, `pack_notes`, `chef_note`, `utensils` | lines in the recipe note |
+| `name_local`, `station_hint` | the description |
+
+A step that names a single cooking time ("Simmer for 8 min") gets an 8-minute timer. Several
+`recipes*.json` files in one zip are merged in name order. Brand slugs follow Station's rule: lower
+case, `&` becomes `and`, anything else that is not a letter or number becomes `-`.
