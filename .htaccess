@@ -1,0 +1,34 @@
+# MustrHQ Recipes
+Options -Indexes
+DirectoryIndex index.php
+
+# Settings and internal files are never served.
+<FilesMatch "^(config\.php|version\.php|\.git.*|\.editorconfig|.*\.md|LICENSE)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(inc|backups|docs|\.github)(/|$) - [F,L]
+</IfModule>
+
+# Pages are never cached by LiteSpeed (they carry sign-in tokens).
+<IfModule LiteSpeed>
+  CacheLookup off
+</IfModule>
+
+# Static files: long cache. URLs carry a version stamp, and photo names never repeat.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml application/manifest+json
+</IfModule>
+AddType font/woff2 .woff2
+AddType application/manifest+json .webmanifest

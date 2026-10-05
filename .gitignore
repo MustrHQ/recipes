@@ -1,0 +1,17 @@
+# Settings written by the installer: contain database credentials
+config.php
+
+# Backups and uploads made by the running app (keep the folders' guards)
+backups/*
+!backups/.htaccess
+!backups/index.php
+uploads/*
+!uploads/.htaccess
+!uploads/index.php
+
+# Logs and OS/editor files
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,11 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff2 binary
+
+# Kept out of release zips: GitHub-only files, screenshots and tests
+/.github export-ignore
+/docs/screenshots export-ignore
+/tests export-ignore
+/.gitattributes export-ignore
+/.editorconfig export-ignore

@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest something that would help in your kitchen
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: job
+    attributes:
+      label: What are you trying to get done?
+      description: Describe the job in the kitchen, not just the button you would add. Who is doing it, and when?
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you do it today?
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who uses it?
+      multiple: true
+      options: [Cooks on the kitchen screen, Managers or admins, Both]

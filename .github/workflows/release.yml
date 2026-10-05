@@ -1,0 +1,42 @@
+name: Release
+
+# Push a tag like v1.0.0 and this builds mustrhq-recipes-1.0.0.zip and publishes the release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches version.php
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          FILE=$(sed -n "s/.*MUSTR_VERSION', '\([^']*\)'.*/\1/p" version.php)
+          echo "tag $TAG, version.php $FILE"
+          [ "$TAG" = "$FILE" ] || { echo "::error::Tag v$TAG does not match version.php ($FILE)"; exit 1; }
+          echo "VERSION=$TAG" >> "$GITHUB_ENV"
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[?" v "\\]?" { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "::error::No section for $VERSION in CHANGELOG.md"; exit 1; }
+          printf '\n---\n**Install:** download `mustrhq-recipes-%s.zip` below, upload it to your hosting and open the folder in your browser.\n**Update:** Admin → Updates and backups → upload the zip.\n' "$VERSION" >> notes.md
+
+      - name: Build the release zip
+        run: git archive --format=zip --prefix=mustrhq-recipes/ -o "mustrhq-recipes-$VERSION.zip" HEAD
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: MustrHQ Recipes ${{ env.VERSION }}
+          body_path: notes.md
+          files: mustrhq-recipes-${{ env.VERSION }}.zip

@@ -1,0 +1,46 @@
+name: Bug report
+description: Something is not working as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Security problems should be reported privately**; see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: MustrHQ Recipes version
+      description: Shown in Admin → Settings → This installation, or in version.php
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: PHP and MySQL/MariaDB versions, and host
+      placeholder: "PHP 8.2, MariaDB 10.6, cPanel shared hosting"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a recipe
+        2. Press Start step by step
+        3. ...
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      multiple: true
+      options: [Desktop browser, Android tablet or phone, iPad or iPhone, Installed app (home screen), Kitchen TV or large screen]
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or error messages

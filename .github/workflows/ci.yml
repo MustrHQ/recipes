@@ -1,0 +1,51 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: PHP ${{ matrix.php }} syntax
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ["8.1", "8.2", "8.3", "8.4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: none
+      - name: Syntax check every PHP file
+        run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
+
+  smoke:
+    name: Install and load every screen
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: recipes
+          MARIADB_USER: recipes
+          MARIADB_PASSWORD: recipes
+        ports: ["3306:3306"]
+        options: --health-cmd="healthcheck.sh --connect" --health-interval=5s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_mysql, gd, zip
+          tools: none
+      - name: Start PHP's built-in server
+        run: php -S 127.0.0.1:8000 -t . > /tmp/php.log 2>&1 &
+      - name: Smoke test
+        env: { DB_HOST: 127.0.0.1, DB_NAME: recipes, DB_USER: recipes, DB_PASS: recipes }
+        run: sleep 2 && tests/smoke.sh http://127.0.0.1:8000
+      - name: PHP server log
+        if: failure()
+        run: cat /tmp/php.log
