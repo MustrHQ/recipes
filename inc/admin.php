@@ -50,7 +50,7 @@ function image_field(string $fileName, string $keepName, string $removeName, ?st
     $id = 'f-' . preg_replace('/\W+/', '-', $fileName);
     ob_start(); ?>
     <div class="imgpick<?= $big ? ' big' : '' ?>">
-      <div class="pv"><?= $current ? '<img src="' . e(img_url($current)) . '" alt="">' : '<div class="noimg">' . icon('image') . '</div>' ?></div>
+      <div class="pv"><?= $current ? '<img src="' . e(thumb_url($current)) . '" alt="" loading="lazy">' : '<div class="noimg">' . icon('image') . '</div>' ?></div>
       <div class="opts">
         <input type="hidden" name="<?= e($keepName) ?>" value="<?= e((string)$current) ?>">
         <label class="btn filebtn" for="<?= $id ?>">

@@ -86,7 +86,7 @@ page_head($r['name'] . ' step by step', 'cook');
       <?php foreach ($r['ingredients'] as $i): ?>
         <li class="ing">
           <button class="thumb" type="button" <?= $i['image'] ? 'data-lb="' . e(img_url($i['image'])) . '"' : 'disabled' ?> data-cap="<?= e($i['name']) ?>" aria-label="Enlarge photo of <?= e($i['name']) ?>">
-            <?= pic($i['image'], $i['name'], '') ?>
+            <?= pic($i['image'], $i['name'], '', true) ?>
           </button>
           <label><input type="checkbox" class="sr" data-got><div class="nm"><?= e($i['name']) ?></div><?php if ($i['note']): ?><div class="nt"><?= e($i['note']) ?></div><?php endif; ?></label>
           <div class="q"><?= e($i['qty']) ?><small><?= e($i['unit']) ?></small></div>

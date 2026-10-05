@@ -41,9 +41,9 @@ function icon(string $name): string
 }
 
 /** Photo, or a striped placeholder telling the team a photo is still to come. */
-function pic(?string $file, string $alt, string $label = 'Photo to come'): string
+function pic(?string $file, string $alt, string $label = 'Photo to come', bool $small = false): string
 {
-    if ($file) return '<img src="' . e(img_url($file)) . '" alt="' . e($alt) . '" loading="lazy">';
+    if ($file) return '<img src="' . e($small ? thumb_url($file) : img_url($file)) . '" alt="' . e($alt) . '" loading="lazy" decoding="async">';
     return '<div class="noimg"><div>' . icon('image') . '<span>' . e($label) . '</span></div></div>';
 }
 

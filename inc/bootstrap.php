@@ -248,10 +248,46 @@ function save_image_bytes(string $bytes, string $label): string
         };
         imagedestroy($src);
         imagedestroy($dst);
-        if ($ok) return $name;
+        if ($ok) { make_thumb($name); return $name; }
     }
     if (@file_put_contents($dest, $bytes) === false) throw new RuntimeException('Could not save "' . $label . '". Check the uploads folder is writable (755).');
+    make_thumb($name);
     return $name;
+}
+
+/* ---------- Thumbnails (tiles and small pictures load these, not the full photo) ---------- */
+const THUMB_SIDE = 480;
+
+/** Make uploads/thumbs/<name>.jpg for a stored photo. Returns true when the thumbnail exists. */
+function make_thumb(string $name): bool
+{
+    if (!preg_match('/^[\w.-]+$/', $name)) return false;
+    $src = UPLOAD_DIR . '/' . $name;
+    $dest = UPLOAD_DIR . '/thumbs/' . $name . '.jpg';
+    if (is_file($dest)) return true;
+    if (!is_file($src) || !extension_loaded('gd')) return false;
+    if (!is_dir(UPLOAD_DIR . '/thumbs') && !@mkdir(UPLOAD_DIR . '/thumbs', 0755)) return false;
+    $info = @getimagesize($src);
+    if (!$info || !($im = @imagecreatefromstring((string)file_get_contents($src)))) return false;
+    [$w, $h] = $info;
+    $r = min(1, THUMB_SIDE / max($w, $h));
+    $tw = max(1, (int)round($w * $r));
+    $th = max(1, (int)round($h * $r));
+    $t = imagecreatetruecolor($tw, $th);
+    imagefill($t, 0, 0, imagecolorallocate($t, 255, 255, 255));   // transparent PNGs go on white
+    imagecopyresampled($t, $im, 0, 0, 0, 0, $tw, $th, $w, $h);
+    $ok = imagejpeg($t, $dest . '.tmp', 78) && @rename($dest . '.tmp', $dest);
+    imagedestroy($im);
+    imagedestroy($t);
+    return $ok;
+}
+
+/** URL of the small version of a photo: the thumbnail if made, else thumb.php makes it on first view. */
+function thumb_url(?string $file): string
+{
+    if (!$file) return '';
+    if (is_file(UPLOAD_DIR . '/thumbs/' . $file . '.jpg')) return base_url('uploads/thumbs/' . rawurlencode($file) . '.jpg');
+    return extension_loaded('gd') ? base_url('thumb.php?f=' . rawurlencode($file)) : img_url($file);
 }
 
 /** Save one uploaded file. Returns the stored name, or null when no file was sent. */
@@ -268,7 +304,10 @@ function save_upload(array $f): ?string
 
 function delete_upload(?string $name): void
 {
-    if ($name && preg_match('/^[\w.-]+$/', $name) && is_file(UPLOAD_DIR . '/' . $name)) @unlink(UPLOAD_DIR . '/' . $name);
+    if ($name && preg_match('/^[\w.-]+$/', $name) && is_file(UPLOAD_DIR . '/' . $name)) {
+        @unlink(UPLOAD_DIR . '/' . $name);
+        @unlink(UPLOAD_DIR . '/thumbs/' . $name . '.jpg');
+    }
 }
 
 /** Delete a photo only when no recipe, ingredient or step uses it any more (imports can share photos). */

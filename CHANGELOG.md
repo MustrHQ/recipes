@@ -4,6 +4,15 @@ All notable changes to MustrHQ Recipes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-10-05
+
+### Fixed
+- The recipe library, admin list and small pictures now load thumbnails instead of full photos.
+  With 300 recipes the library page drops from about 85 MB of pictures to about 8 MB, which
+  matters on kitchen wifi. Thumbnails are made when a photo is saved, and on first view for
+  photos added before this release. Full photos are still used for the dish, step by step and
+  the image preview.
+
 ## [1.1.0] - 2026-10-05
 
 ### Added

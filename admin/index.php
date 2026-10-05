@@ -116,7 +116,7 @@ admin_head('Recipes', 'recipes');
   <tbody>
   <?php foreach ($rows as $r): ?>
     <tr class="tile-row" data-search="<?= e(mb_strtolower($r['name'] . ' ' . $r['code'])) ?>">
-      <td class="th"><?= pic($r['image'], '', '') ?></td>
+      <td class="th"><?= pic($r['image'], '', '', true) ?></td>
       <td><strong><?= e($r['name']) ?></strong><?php if ($r['code']): ?><br><span class="code" style="--c: <?= e($r['colour'] ?: '#01216C') ?>"><?= e($r['code']) ?></span><?php endif; ?></td>
       <td><?= e($r['brand_name'] ?? 'No brand') ?></td>
       <td class="small muted"><?= plural((int)$r['n_ing'], 'ingredient') ?>, <?= plural((int)$r['n_steps'], 'step') ?>,<br><?= plural((int)$r['n_pics'], 'photo') ?></td>

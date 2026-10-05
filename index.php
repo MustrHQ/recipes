@@ -67,7 +67,7 @@ kitchen_top();
           <?php foreach ($items as $r): ?>
             <a class="tile" style="--c: <?= e($r['colour'] ?: '#01216C') ?>" href="recipe.php?id=<?= (int)$r['id'] ?>"
                data-search="<?= e(mb_strtolower($r['name'] . ' ' . $r['code'] . ' ' . $r['brand_name'])) ?>">
-              <div class="ph"><?= pic($r['image'], $r['name']) ?></div>
+              <div class="ph"><?= pic($r['image'], $r['name'], 'Photo to come', true) ?></div>
               <div class="body">
                 <span class="code"><?= e($r['code']) ?><?php if (!$showHeads && !$brandId && $r['brand_name']): ?><span class="br"><?= e($r['brand_name']) ?></span><?php endif; ?></span>
                 <h3><?= e($r['name']) ?></h3>

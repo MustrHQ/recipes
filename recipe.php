@@ -79,7 +79,7 @@ kitchen_top();
         <?php foreach ($r['ingredients'] as $i): ?>
           <li class="ing">
             <button class="thumb" type="button" data-lb="<?= e(img_url($i['image'])) ?>" data-cap="<?= e($i['name']) ?>" <?= $i['image'] ? '' : 'disabled' ?> aria-label="Enlarge photo of <?= e($i['name']) ?>">
-              <?= pic($i['image'], $i['name'], '') ?>
+              <?= pic($i['image'], $i['name'], '', true) ?>
             </button>
             <label>
               <input type="checkbox" class="sr" data-got>
@@ -110,7 +110,7 @@ kitchen_top();
             </div>
             <?php if ($s['image']): ?>
               <button class="simg" type="button" data-lb="<?= e(img_url($s['image'])) ?>" data-cap="Step <?= $n + 1 ?><?= $s['title'] ? ': ' . e($s['title']) : '' ?>" aria-label="Enlarge photo for step <?= $n + 1 ?>">
-                <?= pic($s['image'], 'Step ' . ($n + 1)) ?>
+                <?= pic($s['image'], 'Step ' . ($n + 1), 'Photo to come', true) ?>
               </button>
             <?php else: ?><div></div><?php endif; ?>
           </li>

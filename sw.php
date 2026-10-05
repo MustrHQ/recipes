@@ -42,7 +42,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   // Photos never change once uploaded (a new photo gets a new name), so cache-first is safe.
-  if (url.pathname.includes('/uploads/')) {
+  if (url.pathname.includes('/uploads/') || url.pathname.endsWith('/thumb.php')) {
     e.respondWith(caches.open(PHOTOS).then((c) => c.match(req).then((hit) => hit || fetch(req).then((res) => {
       if (res.ok) c.put(req, res.clone());
       return res;
