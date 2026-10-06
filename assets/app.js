@@ -4,37 +4,95 @@
   var $ = function (s, el) { return (el || document).querySelector(s); };
   var $$ = function (s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
 
-  /* ---------- Image preview (lightbox) ---------- */
+  /* ---------- Image preview ----------
+   * The picture is fitted to the screen, then zoomed with a transform:
+   * pinch, double-tap (or click) and the zoom button zoom in; drag moves a zoomed picture;
+   * swipe left/right for the next picture, swipe down to close. */
   var lb = $('#lb');
   if (lb) {
-    var img = $('#lbImg'), cap = $('#lbCap'), pos = $('#lbPos'), stage = $('#lbStage');
-    var list = [], idx = 0, zoom = 1, tx = 0, ty = 0, lastFocus = null;
+    var img = $('#lbImg'), stage = $('#lbStage'), wait = $('#lbWait'), err = $('#lbErr');
+    var cap = $('#lbCap'), pos = $('#lbPos'), zoomBtn = $('#lbZoom'), prevBtn = $('#lbPrev'), nextBtn = $('#lbNext');
+    var coarse = window.matchMedia('(pointer: coarse)').matches;
+    $('#lbHint').textContent = coarse
+      ? 'Pinch or double-tap to zoom. Swipe for the next picture, or down to close.'
+      : 'Click or scroll to zoom. Use the arrow keys for the next picture.';
+    var MAX = 5, list = [], idx = 0, lastFocus = null;
+    var fw = 0, fh = 0, ox = 0, oy = 0;      // fitted size and offset inside the stage
+    var s = 1, tx = 0, ty = 0;                // zoom and pan (pan is relative to the fitted position)
 
     var items = function () {
       return $$('[data-lb]').filter(function (el) { return el.getAttribute('data-lb') && !el.closest('.drawer:not(.on)'); });
     };
-    var apply = function () { img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + zoom + ')'; img.classList.toggle('zoomed', zoom > 1); };
-    var resetZoom = function () { zoom = 1; tx = 0; ty = 0; apply(); };
+    var draw = function (animate) {
+      stage.classList.toggle('anim', !!animate);
+      img.style.transform = 'translate(' + (ox + tx) + 'px,' + (oy + ty) + 'px) scale(' + s + ')';
+      img.classList.toggle('zoomed', s > 1.01);
+      zoomBtn.setAttribute('aria-pressed', s > 1.01 ? 'true' : 'false');
+      zoomBtn.setAttribute('aria-label', s > 1.01 ? 'Zoom out' : 'Zoom in');
+    };
+    /** Keep a zoomed picture covering the stage: no empty gaps at the edges. */
+    var clamp = function () {
+      var W = stage.clientWidth, H = stage.clientHeight, w = fw * s, h = fh * s;
+      var minX = Math.min(0, W - w) - ox, maxX = Math.max(0, W - w) - ox;
+      var minY = Math.min(0, H - h) - oy, maxY = Math.max(0, H - h) - oy;
+      if (w <= W) tx = (W - w) / 2 - ox; else tx = Math.max(minX, Math.min(maxX, tx));
+      if (h <= H) ty = (H - h) / 2 - oy; else ty = Math.max(minY, Math.min(maxY, ty));
+    };
+    var fit = function () {
+      if (!img.naturalWidth) return;
+      var W = stage.clientWidth, H = stage.clientHeight, r = Math.min(W / img.naturalWidth, H / img.naturalHeight, 2);
+      fw = img.naturalWidth * r; fh = img.naturalHeight * r;
+      img.style.width = fw + 'px'; img.style.height = fh + 'px';
+      ox = (W - fw) / 2; oy = (H - fh) / 2; s = 1; tx = 0; ty = 0;
+      draw(false);
+    };
+    /** Zoom to scale n, keeping the point (cx, cy) on screen where it is. */
+    var zoomTo = function (n, cx, cy, animate) {
+      n = Math.max(1, Math.min(MAX, n));
+      var r = stage.getBoundingClientRect();
+      var px = (cx === undefined ? r.width / 2 : cx - r.left), py = (cy === undefined ? r.height / 2 : cy - r.top);
+      tx = px - ox - (px - ox - tx) * (n / s);
+      ty = py - oy - (py - oy - ty) * (n / s);
+      s = n;
+      if (s === 1) { tx = 0; ty = 0; }
+      clamp(); draw(animate);
+    };
+    var toggleZoom = function (cx, cy) { zoomTo(s > 1.01 ? 1 : 2.5, cx, cy, true); };
+
     var show = function (i) {
+      if (!list.length) return;
       idx = (i + list.length) % list.length;
-      var el = list[idx];
-      img.src = el.getAttribute('data-lb');
-      img.alt = el.getAttribute('data-cap') || '';
+      var el = list[idx], src = el.getAttribute('data-lb');
       cap.textContent = el.getAttribute('data-cap') || '';
+      img.alt = cap.textContent;
       pos.textContent = list.length > 1 ? (idx + 1) + ' of ' + list.length : '';
-      $('#lbPrev').hidden = $('#lbNext').hidden = list.length < 2;
-      resetZoom();
+      prevBtn.disabled = nextBtn.disabled = list.length < 2;
+      err.hidden = true;
+      img.classList.remove('ready');
+      wait.hidden = false;
+      img.onload = function () { wait.hidden = true; fit(); img.classList.add('ready'); };
+      img.onerror = function () { wait.hidden = true; err.hidden = false; };
+      img.src = src;
+      if (img.complete && img.naturalWidth) img.onload();
+      // Load the neighbours now, so swiping on is instant.
+      [idx - 1, idx + 1].forEach(function (j) {
+        var n = list[(j + list.length) % list.length];
+        if (n && n !== el) (new Image()).src = n.getAttribute('data-lb');
+      });
     };
     var open = function (el) {
       list = items();
       if (!list.length) return;
       lastFocus = document.activeElement;
       lb.hidden = false; lb.classList.add('on');
+      document.documentElement.classList.add('lb-open');
       show(Math.max(0, list.indexOf(el)));
       $('#lbClose').focus();
     };
     var close = function () {
-      lb.classList.remove('on'); lb.hidden = true; img.removeAttribute('src');
+      lb.classList.remove('on'); lb.hidden = true;
+      document.documentElement.classList.remove('lb-open');
+      img.onload = img.onerror = null; img.removeAttribute('src'); img.classList.remove('ready');
       if (lastFocus) lastFocus.focus();
     };
     document.addEventListener('click', function (e) {
@@ -42,47 +100,98 @@
       if (el && el.getAttribute('data-lb') && !lb.contains(el)) { e.preventDefault(); open(el); }
     });
     $('#lbClose').addEventListener('click', close);
-    $('#lbPrev').addEventListener('click', function () { show(idx - 1); });
-    $('#lbNext').addEventListener('click', function () { show(idx + 1); });
-    stage.addEventListener('click', function (e) { if (e.target === stage) close(); });
+    prevBtn.addEventListener('click', function () { show(idx - 1); });
+    nextBtn.addEventListener('click', function () { show(idx + 1); });
+    zoomBtn.addEventListener('click', function () { toggleZoom(); });
+    window.addEventListener('resize', function () { if (lb.classList.contains('on')) fit(); });
 
-    // Double-tap / double-click to zoom; drag to pan when zoomed; swipe to change picture.
-    var lastTap = 0, sx = 0, sy = 0, ox = 0, oy = 0, dragging = false, moved = false;
-    var toggleZoom = function (cx, cy) {
-      if (zoom > 1) { resetZoom(); return; }
-      var r = img.getBoundingClientRect();
-      zoom = 2.5;
-      tx = (r.left + r.width / 2 - cx) * (zoom - 1);
-      ty = (r.top + r.height / 2 - cy) * (zoom - 1);
-      apply();
-    };
-    img.addEventListener('dblclick', function (e) { toggleZoom(e.clientX, e.clientY); });
+    // Touch, pen and mouse, all through pointer events.
+    var pts = {}, gesture = null, lastTap = { t: 0, x: 0, y: 0 };
+    var count = function () { return Object.keys(pts).length; };
+    var mid = function () { var k = Object.keys(pts), a = pts[k[0]], b = pts[k[1]]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) }; };
     stage.addEventListener('pointerdown', function (e) {
-      if (e.target !== img) return;
-      dragging = true; moved = false; sx = e.clientX; sy = e.clientY; ox = tx; oy = ty;
-      img.setPointerCapture(e.pointerId);
-    });
-    stage.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
-      var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
-      if (zoom > 1) { tx = ox + dx; ty = oy + dy; apply(); }
-    });
-    stage.addEventListener('pointerup', function (e) {
-      if (!dragging) return;
-      dragging = false;
-      var dx = e.clientX - sx;
-      if (zoom === 1 && moved && Math.abs(dx) > 60 && list.length > 1) { show(idx + (dx < 0 ? 1 : -1)); return; }
-      if (!moved && e.pointerType !== 'mouse') {
-        var now = Date.now();
-        if (now - lastTap < 320) { toggleZoom(e.clientX, e.clientY); lastTap = 0; } else lastTap = now;
+      if (e.button > 0) return;
+      stage.setPointerCapture(e.pointerId);
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (count() === 2) {
+        var m = mid();
+        gesture = { type: 'pinch', d: m.d, s: s, x: m.x, y: m.y, tx: tx, ty: ty };
+      } else if (count() === 1) {
+        gesture = { type: 'one', x: e.clientX, y: e.clientY, tx: tx, ty: ty, t: Date.now(), moved: false, onImg: e.target === img, mouse: e.pointerType === 'mouse' };
+        if (s > 1.01) img.classList.add('grabbing');
       }
     });
+    stage.addEventListener('pointermove', function (e) {
+      if (!pts[e.pointerId] || !gesture) return;
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (gesture.type === 'pinch' && count() >= 2) {
+        var m = mid(), n = Math.max(1, Math.min(MAX, gesture.s * m.d / gesture.d));
+        // Zoom about the pinch centre and follow the fingers as they move.
+        s = gesture.s; tx = gesture.tx + (m.x - gesture.x); ty = gesture.ty + (m.y - gesture.y);
+        zoomTo(n, m.x, m.y, false);
+        return;
+      }
+      if (gesture.type !== 'one') return;
+      var dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) gesture.moved = true;
+      if (s > 1.01) { tx = gesture.tx + dx; ty = gesture.ty + dy; clamp(); draw(false); }
+      else if (!gesture.mouse && gesture.moved) {
+        // At normal size the picture follows the finger: sideways to change, down to close.
+        if (Math.abs(dy) > Math.abs(dx) && dy > 0) { tx = 0; ty = dy; img.style.opacity = String(Math.max(.3, 1 - dy / 400)); }
+        else { tx = dx; ty = 0; img.style.opacity = ''; }
+        draw(false);
+      }
+    });
+    var end = function (e) {
+      if (!pts[e.pointerId]) return;
+      delete pts[e.pointerId];
+      img.classList.remove('grabbing');
+      if (!gesture) return;
+      if (gesture.type === 'pinch') {
+        if (count() === 0) { if (s < 1.05) zoomTo(1, undefined, undefined, true); gesture = null; }
+        else gesture = null;   // one finger left: wait for it to lift
+        return;
+      }
+      var g = gesture; gesture = null;
+      var dx = e.clientX - g.x, dy = e.clientY - g.y;
+      img.style.opacity = '';
+      if (s <= 1.01 && g.moved && !g.mouse) {
+        if (dy > 110 && Math.abs(dy) > Math.abs(dx)) { close(); return; }
+        if (Math.abs(dx) > 70 && list.length > 1) { tx = 0; ty = 0; show(idx + (dx < 0 ? 1 : -1)); return; }
+        tx = 0; ty = 0; draw(true); return;
+      }
+      if (g.moved || Date.now() - g.t > 400) return;
+      // A tap. Mouse: one click zooms. Touch: double-tap zooms; one tap off the picture closes.
+      if (g.mouse) { if (g.onImg) toggleZoom(e.clientX, e.clientY); else if (s <= 1.01) close(); return; }
+      var now = Date.now();
+      if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) {
+        clearTimeout(lastTap.timer); lastTap.t = 0; toggleZoom(e.clientX, e.clientY);
+      } else {
+        lastTap = { t: now, x: e.clientX, y: e.clientY, timer: (!g.onImg && s <= 1.01) ? setTimeout(close, 330) : 0 };
+      }
+    };
+    stage.addEventListener('pointerup', end);
+    stage.addEventListener('pointercancel', end);
+    stage.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      zoomTo(s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)), e.clientX, e.clientY, false);
+    }, { passive: false });
+    img.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    // Safari's own pinch gesture would zoom the whole page instead of the picture.
+    ['gesturestart', 'gesturechange'].forEach(function (t) { stage.addEventListener(t, function (e) { e.preventDefault(); }); });
+
     document.addEventListener('keydown', function (e) {
       if (!lb.classList.contains('on')) return;
-      if (e.key === 'Escape') { close(); e.stopImmediatePropagation(); }
-      else if (e.key === 'ArrowLeft') { show(idx - 1); e.stopImmediatePropagation(); }
-      else if (e.key === 'ArrowRight') { show(idx + 1); e.stopImmediatePropagation(); }
+      var k = e.key, done = true;
+      if (k === 'Escape') close();
+      else if (k === 'ArrowLeft') show(idx - 1);
+      else if (k === 'ArrowRight') show(idx + 1);
+      else if (k === '+' || k === '=') zoomTo(s * 1.5, undefined, undefined, true);
+      else if (k === '-') zoomTo(s / 1.5, undefined, undefined, true);
+      else if (k === '0') zoomTo(1, undefined, undefined, true);
+      else if (k === ' ' || k === 'PageDown' || k === 'PageUp' || k === 'ArrowUp' || k === 'ArrowDown') { /* keep the page behind still */ }
+      else done = false;
+      if (done) { e.preventDefault(); e.stopImmediatePropagation(); }
     }, true);
   }
 
@@ -236,6 +345,17 @@
     tick(); setInterval(tick, 15000);
   }
 
+  // Show / hide a password.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-reveal]');
+    if (!b) return;
+    var i = document.getElementById(b.getAttribute('data-reveal')), on = i.type === 'password';
+    i.type = on ? 'text' : 'password';
+    b.textContent = on ? 'Hide' : 'Show';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    i.focus();
+  });
+
   // "Select all" boxes in tables.
   document.addEventListener('change', function (e) {
     var all = e.target.closest('[data-check-all]');
@@ -251,19 +371,37 @@
     if (s) { e.preventDefault(); s.focus(); s.select(); }
   });
 
-  // "Install app" button, where the browser offers it (Chrome and Edge on Android and desktop).
-  var deferred = null;
-  window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault(); deferred = e;
-    $$('[data-install]').forEach(function (b) { b.hidden = false; });
-  });
-  document.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-install]');
-    if (!b || !deferred) return;
-    deferred.prompt();
-    deferred.userChoice.then(function () { deferred = null; $$('[data-install]').forEach(function (x) { x.hidden = true; }); });
-  });
-  if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) document.documentElement.classList.add('in-app');
+  // "Install app" card on the start screen, the same as MustrHQ Stock: Chrome and Edge get an
+  // Install button; iPad and iPhone get the Safari steps. Hidden once installed or dismissed.
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || window.navigator.standalone === true;
+  if (standalone) document.documentElement.classList.add('in-app');
+  var card = $('[data-install]');
+  if (card) {
+    var dismissed = false;
+    try { dismissed = localStorage.getItem('mustr-install-dismissed') === '1'; } catch (e) {}
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!standalone && !dismissed) {
+      var deferred = null, ibtn = $('[data-install-btn]', card);
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault(); deferred = e; card.hidden = false; ibtn.hidden = false;
+      });
+      ibtn.addEventListener('click', function () {
+        if (!deferred) return;
+        deferred.prompt();
+        deferred.userChoice.then(function () { card.hidden = true; deferred = null; });
+      });
+      if (ios) {
+        $('[data-install-text]', card).innerHTML = 'On an iPad: open this page in <strong>Safari</strong>, tap <strong>Share</strong>, then '
+          + '<strong>Add to Home Screen</strong>. It opens full screen like any other app.';
+        card.hidden = false;
+      }
+      window.addEventListener('appinstalled', function () { card.hidden = true; });
+    }
+    $('[data-install-dismiss]', card).addEventListener('click', function () {
+      card.hidden = true;
+      try { localStorage.setItem('mustr-install-dismissed', '1'); } catch (e) {}
+    });
+  }
 
   // Installable app: register the service worker (it only caches static files).
   if ('serviceWorker' in navigator && document.querySelector('link[rel=manifest]')) {

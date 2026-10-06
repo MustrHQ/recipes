@@ -26,6 +26,16 @@ page_head('Start', 'start-page');
     </div>
   </header>
 
+  <section class="install-card" data-install hidden>
+    <span class="install-ic"><?= icon('tablet') ?></span>
+    <div>
+      <h2>Put this on the tablet as an app</h2>
+      <p data-install-text>It opens full screen on this page, with no browser bar, and keeps recipe photos for when the wifi drops.</p>
+    </div>
+    <button class="btn btn-primary" type="button" data-install-btn hidden><?= icon('download') ?>Install app</button>
+    <button class="ibtn" type="button" data-install-dismiss aria-label="Hide this"><?= icon('close') ?></button>
+  </section>
+
   <h2 class="start-q">What do you need?</h2>
 
   <div class="choices">
@@ -69,7 +79,6 @@ page_head('Start', 'start-page');
   </div>
 
   <footer class="start-f">
-    <button class="btn install-btn" type="button" data-install hidden><?= icon('download') ?><span>Install app on this tablet</span></button>
     <?= admin_link('btn btn-ghost admin-link') ?>
   </footer>
 </main>

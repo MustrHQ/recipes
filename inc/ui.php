@@ -35,6 +35,7 @@ function icon(string $name): string
         'minus' => '<path d="M5 12h14"/>',
         'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
         'lock' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+        'tablet' => '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/>',
         'arrow' => '<path d="M5 12h14M13 6l6 6-6 6"/>',
         'print' => '<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2"/><rect x="6" y="14" width="12" height="7"/>',
     ][$name] ?? '';
@@ -79,7 +80,8 @@ function page_head(string $title, string $bodyClass = '', bool $app = true): voi
 <?php if ($app): ?><link rel="manifest" href="<?= e(base_url('manifest.php')) ?>">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Recipes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="<?= e(mb_substr(kitchen_name(), 0, 14)) ?>">
 <?php endif; ?>
 <link rel="preload" href="<?= e(base_url('assets/fonts/archivo-var.woff2')) ?>" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="<?= e(asset('app.css')) ?>">
@@ -104,7 +106,6 @@ function kitchen_top(string $active = 'recipes', string $tools = ''): void
   </nav>
   <span class="spacer"></span>
   <?= $tools ?>
-  <button class="btn install-btn" type="button" data-install hidden><?= icon('download') ?><span>Install app</span></button>
   <?= admin_link() ?>
 </header>
 <?php
@@ -131,18 +132,23 @@ function not_found(string $title, string $text): never
 
 function lightbox_markup(): void
 { ?>
-<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Image preview" hidden>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-labelledby="lbCap" hidden>
   <div class="lb-top">
     <div class="cap" id="lbCap"></div>
     <div class="pos" id="lbPos"></div>
+    <button class="ibtn" type="button" id="lbZoom" aria-label="Zoom in"><?= icon('zoom') ?></button>
     <button class="ibtn" type="button" id="lbClose" aria-label="Close preview"><?= icon('close') ?></button>
   </div>
   <div class="lb-stage" id="lbStage">
-    <img id="lbImg" alt="">
-    <button class="ibtn lb-prev" type="button" id="lbPrev" aria-label="Previous image"><?= icon('back') ?></button>
-    <button class="ibtn lb-next" type="button" id="lbNext" aria-label="Next image"><?= icon('next') ?></button>
+    <img id="lbImg" alt="" draggable="false">
+    <div class="lb-wait" id="lbWait" aria-hidden="true"><span></span></div>
+    <p class="lb-err" id="lbErr" hidden>This picture could not load. Check the wifi and try again.</p>
   </div>
-  <div class="lb-hint">Double-tap to zoom. Swipe or use the arrows to see the next picture.</div>
+  <div class="lb-foot">
+    <button class="ibtn" type="button" id="lbPrev" aria-label="Previous picture"><?= icon('back') ?></button>
+    <div class="lb-hint" id="lbHint"></div>
+    <button class="ibtn" type="button" id="lbNext" aria-label="Next picture"><?= icon('next') ?></button>
+  </div>
 </div>
 <?php }
 

@@ -103,10 +103,10 @@ one-click updates). Most cPanel hosts have all of these.
 
 Install the screens as an app on each tablet:
 
-- **Android:** open the address in Chrome and tap **Install app** in the top bar (or ⋮ → Install app).
+- **Android:** open the address in Chrome and tap **Install app** on the start screen card (or ⋮ → Install app).
 - **iPad:** open it in Safari, then Share → **Add to Home Screen**.
 
-The app opens full screen on the recipes, has a shortcut straight to **Labels**, keeps the screen
+The app opens full screen on the start screen, the same way as the MustrHQ Rota kiosk, has a shortcut straight to **Labels**, keeps the screen
 awake during step by step, and keeps photos for when the kitchen wifi drops. Android's **App
 pinning** and iPad's **Guided Access** lock a tablet to it. Admin → Settings has the same guide.
 

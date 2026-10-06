@@ -89,7 +89,7 @@ admin_head('Settings', 'settings');
     <div class="howto-grid">
       <div><h3>Android tablet</h3><ol>
         <li>Open <code><?= e((isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '') . base_url()) ?></code> in Chrome.</li>
-        <li>Tap <strong>Install app</strong> in the top bar, or the ⋮ menu → <strong>Install app</strong>.</li>
+        <li>Tap <strong>Install app</strong> on the card on the start screen, or the ⋮ menu → <strong>Install app</strong>.</li>
         <li>For Bluetooth label printing, open <strong>Labels</strong> → printer button → <strong>Connect</strong>.</li></ol></div>
       <div><h3>iPad</h3><ol>
         <li>Open the same address in Safari.</li>

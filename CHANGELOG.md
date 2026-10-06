@@ -4,6 +4,27 @@ All notable changes to MustrHQ Recipes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-10-06
+
+### Fixed
+- **Image preview.** On landscape tablets and computers the picture was drawn larger than the
+  screen, so the bottom was cut off and the arrows sat on top of it. Pictures now always fit.
+  Double-tap to zoom did nothing on touch screens; it works now, along with **pinch to zoom**,
+  dragging a zoomed picture (it stops at the picture's edges), swiping to the next picture,
+  **swiping down to close**, a zoom button, click and scroll-wheel zoom on a computer, and
+  `+` `-` `0` keys. The page behind no longer scrolls, a spinner shows while a large photo
+  loads, and the next and previous photos load in advance.
+- **Sign-in page.** Rebuilt: a clear "Kitchen screens" back link, full-width Sign in button,
+  Show/Hide password, a note that staff don't need to sign in, and a compact layout on tablets
+  in portrait and on phones.
+
+### Changed
+- **Tablet app, the same as the other MustrHQ apps.** Opens full screen with a navy splash and a
+  black status bar, like the Rota kiosk, and is named after the kitchen on the home screen. The
+  start screen shows an **Install app** card, like MustrHQ Stock: an Install button on Android
+  and Chrome, the Safari steps on iPad, and a button to hide it.
+- "Recipe admin" is now "Kitchen admin", as it covers labels too.
+
 ## [1.2.0] - 2026-10-06
 
 ### Added

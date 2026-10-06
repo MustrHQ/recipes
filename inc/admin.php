@@ -19,7 +19,7 @@ function admin_head(string $title, string $active): void
     ?>
 <div class="admin">
   <aside class="side">
-    <a class="mark" href="<?= e(base_url('admin/')) ?>"><span class="mark-box"><?= mark_svg() ?></span><span><?= e(kitchen_name()) ?><small>Recipe admin</small></span></a>
+    <a class="mark" href="<?= e(base_url('admin/')) ?>"><span class="mark-box"><?= mark_svg() ?></span><span><?= e(kitchen_name()) ?><small>Kitchen admin</small></span></a>
     <?php foreach ($nav as $grp => $items): ?>
       <div class="grp"><?= e($grp) ?></div>
       <?php foreach ($items as [$key, $href, $ic, $label]): ?>
@@ -27,7 +27,7 @@ function admin_head(string $title, string $active): void
       <?php endforeach; ?>
     <?php endforeach; ?>
     <div class="grp">Kitchen screens</div>
-    <a class="nav" href="<?= e(base_url()) ?>" target="_blank" rel="noopener"><?= icon('eye') ?>Open kitchen screens</a>
+    <a class="nav" href="<?= e(base_url()) ?>"><?= icon('eye') ?>Open kitchen screens</a>
     <a class="nav" href="<?= e(base_url('admin/logout.php')) ?>"><?= icon('out') ?>Sign out</a>
     <div class="foot">MustrHQ Recipes <?= e(APP_VERSION) ?><br><a href="https://github.com/MustrHQ/recipes" target="_blank" rel="noopener">Source code</a> (AGPL-3.0)</div>
   </aside>

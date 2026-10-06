@@ -3,18 +3,18 @@
 require __DIR__ . '/inc/bootstrap.php';
 header('Content-Type: application/manifest+json; charset=utf-8');
 header('Cache-Control: public, max-age=3600');
-$name = kitchen_name() . ' recipes';
+$name = kitchen_name();
 echo json_encode([
     'id' => './',
     'name' => $name,
-    'short_name' => mb_strlen($name) > 12 ? 'Recipes' : $name,
-    'description' => 'Recipes, ingredients and step-by-step guides for the kitchen.',
+    'short_name' => mb_strlen($name) > 12 ? mb_substr($name, 0, 12) : $name,
+    'description' => 'Recipes, step-by-step guides and use-by labels for the kitchen.',
     'start_url' => './?source=app',
     'scope' => './',
-    'display' => 'standalone',
-    'display_override' => ['standalone', 'fullscreen', 'minimal-ui'],
+    'display' => 'fullscreen',
+    'display_override' => ['fullscreen', 'standalone', 'minimal-ui'],
     'orientation' => 'any',
-    'background_color' => '#EEF1F6',
+    'background_color' => '#01216C',
     'theme_color' => '#01216C',
     'categories' => ['food', 'business', 'productivity'],
     'icons' => [
