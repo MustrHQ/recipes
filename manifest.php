@@ -23,7 +23,7 @@ echo json_encode([
         ['src' => 'assets/icons/maskable-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
     ],
     'shortcuts' => [
-        ['name' => 'Recipes', 'url' => './?source=shortcut', 'icons' => [['src' => 'assets/icons/sc-recipes.png', 'sizes' => '96x96']]],
+        ['name' => 'Recipes', 'url' => './recipes.php?source=shortcut', 'icons' => [['src' => 'assets/icons/sc-recipes.png', 'sizes' => '96x96']]],
         ['name' => 'Print a label', 'url' => './labels.php?source=shortcut', 'icons' => [['src' => 'assets/icons/sc-labels.png', 'sizes' => '96x96']]],
     ],
     'screenshots' => [

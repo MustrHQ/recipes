@@ -34,6 +34,8 @@ function icon(string $name): string
         'bluetooth' => '<path d="m7 7 10 10-5 5V2l5 5L7 17"/>',
         'minus' => '<path d="M5 12h14"/>',
         'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+        'lock' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+        'arrow' => '<path d="M5 12h14M13 6l6 6-6 6"/>',
         'print' => '<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2"/><rect x="6" y="14" width="12" height="7"/>',
     ][$name] ?? '';
     $fill = $name === 'play' ? 'currentColor' : 'none';
@@ -90,31 +92,30 @@ function page_head(string $title, string $bodyClass = '', bool $app = true): voi
 
 function kitchen_top(string $active = 'recipes', string $tools = ''): void
 {
-    static $hasLabels = null;
-    if ($hasLabels === null) {
-        try { $hasLabels = (bool)db()->query('SELECT 1 FROM label_items WHERE active = 1 LIMIT 1')->fetchColumn(); }
-        catch (Throwable $t) { $hasLabels = false; }
-    }
     ?>
 <header class="top">
-  <a class="mark" href="<?= e(base_url()) ?>">
+  <a class="mark" href="<?= e(base_url()) ?>" aria-label="<?= e(kitchen_name()) ?>: back to the start screen">
     <span class="mark-box"><?= mark_svg() ?></span>
     <span><?= e(kitchen_name()) ?><small><?= $active === 'labels' ? 'Labels' : 'Recipes' ?></small></span>
   </a>
-  <?php if ($hasLabels || $active === 'labels'): ?>
-  <nav class="tabs" aria-label="Kitchen screens">
-    <a href="<?= e(base_url()) ?>" <?= $active === 'recipes' ? 'aria-current="page"' : '' ?>><?= icon('book') ?><span>Recipes</span></a>
+  <nav class="tabs" aria-label="Switch screen">
+    <a href="<?= e(base_url('recipes.php')) ?>" <?= $active === 'recipes' ? 'aria-current="page"' : '' ?>><?= icon('book') ?><span>Recipes</span></a>
     <a href="<?= e(base_url('labels.php')) ?>" <?= $active === 'labels' ? 'aria-current="page"' : '' ?>><?= icon('tag') ?><span>Labels</span></a>
   </nav>
-  <?php endif; ?>
   <span class="spacer"></span>
   <?= $tools ?>
   <button class="btn install-btn" type="button" data-install hidden><?= icon('download') ?><span>Install app</span></button>
-  <?php if (is_admin()): ?>
-    <a class="btn" href="<?= e(base_url('admin/')) ?>"><?= icon('cog') ?><span>Admin</span></a>
-  <?php endif; ?>
+  <?= admin_link() ?>
 </header>
 <?php
+}
+
+/** "Admin" for a signed-in manager; a quiet "Admin sign in" for everyone else. */
+function admin_link(string $class = 'btn admin-link'): string
+{
+    return is_admin()
+        ? '<a class="' . $class . '" href="' . e(base_url('admin/')) . '">' . icon('cog') . '<span>Admin</span></a>'
+        : '<a class="' . $class . '" href="' . e(base_url('admin/login.php')) . '">' . icon('lock') . '<span>Admin sign in</span></a>';
 }
 
 /** A full page saying something was not found, with a way back. */
@@ -123,7 +124,7 @@ function not_found(string $title, string $text): never
     http_response_code(404);
     page_head($title);
     kitchen_top();
-    echo '<main class="wrap" id="main"><div class="empty"><h2>' . e($title) . '</h2><p>' . e($text) . '</p><a class="btn btn-primary" href="' . e(base_url()) . '">' . icon('back') . 'All recipes</a></div></main>';
+    echo '<main class="wrap" id="main"><div class="empty"><h2>' . e($title) . '</h2><p>' . e($text) . '</p><a class="btn btn-primary" href="' . e(base_url('recipes.php')) . '">' . icon('back') . 'All recipes</a></div></main>';
     page_foot();
     exit;
 }

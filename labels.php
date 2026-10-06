@@ -44,8 +44,9 @@ kitchen_top('labels', $printerChip);
   <?php if (!$items): ?>
     <div class="empty">
       <h2>No label items yet</h2>
-      <p>Labels are set up in the admin panel: each item has a shelf life, and the screen works out the use-by date for you.</p>
-      <?php if (is_admin()): ?><a class="btn btn-primary" href="<?= e(base_url('admin/labels.php')) ?>"><?= icon('plus') ?>Set up labels</a><?php endif; ?>
+      <p>A manager adds the things your team labels, each with its shelf life. After that, anyone can print labels here without signing in.</p>
+      <?php if (is_admin()): ?><a class="btn btn-primary" href="<?= e(base_url('admin/labels.php')) ?>"><?= icon('plus') ?>Set up labels</a>
+      <?php else: ?><a class="btn" href="<?= e(base_url('admin/login.php')) ?>"><?= icon('lock') ?>Manager? Sign in to set them up</a><?php endif; ?>
     </div>
   <?php else: ?>
   <div class="find">

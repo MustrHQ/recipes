@@ -63,7 +63,7 @@ page_head($r['name'] . ' step by step', 'cook');
         <div class="frow">
           <button class="btn btn-big" type="button" data-go="0"><?= icon('restart') ?>Start again</button>
           <?php if ($labelId): ?><a class="btn btn-big" href="labels.php?item=<?= $labelId ?>"><?= icon('printer') ?>Print label</a><?php endif; ?>
-          <a class="btn btn-big btn-go" href="<?= e(base_url($r['brand_id'] ? '?brand=' . (int)$r['brand_id'] : '')) ?>"><?= icon('check') ?>Done, back to recipes</a>
+          <a class="btn btn-big btn-go" href="<?= e(base_url('recipes.php' . ($r['brand_id'] ? '?brand=' . (int)$r['brand_id'] : ''))) ?>"><?= icon('check') ?>Done, back to recipes</a>
         </div>
       </div>
     </section>

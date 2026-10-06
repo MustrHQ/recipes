@@ -22,12 +22,18 @@ OUT=$(curl -sf -c "$JAR" -b "$JAR" "$BASE/install.php" \
 echo "$OUT" | grep -q "Your recipe portal is ready" || { echo "$OUT" | grep -o 'class="alert bad">[^<]*' >&2; fail "installer did not finish"; }
 
 echo "2. Kitchen screens"
-has "Chicken katsu rice bowl" "$BASE/" || fail "library does not list the demo recipe"
+has "What do you need?" "$BASE/" || fail "start screen"
+has "Admin sign in" "$BASE/" || fail "admin sign-in link on the start screen"
+has "Chicken katsu rice bowl" "$BASE/recipes.php" || fail "library does not list the demo recipe"
+CODE=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/?brand=1")
+case "$CODE" in "302 "*recipes.php?brand=1) ;; *) fail "old library link should redirect, got $CODE" ;; esac
 has "What you need" "$BASE/recipe.php?id=1" || fail "recipe page"
 has "data-cook" "$BASE/cook.php?id=1" || fail "step-by-step page"
 has '"start_url"' "$BASE/manifest.php" || fail "manifest"
 has "mustr-recipes-" "$BASE/sw.php" || fail "service worker"
 has "Print label" "$BASE/labels.php" || fail "labels screen"
+has 'href="/labels.php"' "$BASE/recipes.php" || fail "Labels tab on the recipes screen"
+has 'href="/recipes.php"' "$BASE/labels.php" || fail "Recipes tab on the labels screen"
 has "labels.php?item=" "$BASE/recipe.php?id=1" || fail "Print label button on the recipe"
 CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/recipe.php?id=999")
 [ "$CODE" = "404" ] || fail "missing recipe should be 404, got $CODE"

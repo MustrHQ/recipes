@@ -4,6 +4,21 @@ All notable changes to MustrHQ Recipes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-10-06
+
+### Added
+- **Start screen.** The kitchen address now opens on "What do you need?" with two big choices,
+  **Recipes** and **Labels**, plus today's date and time. Staff need no admin account for
+  either: only the kitchen code, if one is set.
+- **Admin sign in** link on the start screen and in the top bar, for managers. Signed-in
+  managers see **Admin** instead.
+
+### Changed
+- The **Recipes** and **Labels** tabs are always in the top bar, so staff can switch at any time,
+  even before any label items exist.
+- The recipe library moved to `recipes.php`. Old links such as `/?brand=3` redirect there.
+- The app's Recipes shortcut opens the library; the app itself opens on the start screen.
+
 ## [1.1.1] - 2026-10-05
 
 ### Fixed

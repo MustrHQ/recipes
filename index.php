@@ -1,92 +1,76 @@
 <?php
+/** The start screen: staff choose Recipes or Labels. Managers sign in to the admin from here. */
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/ui.php';
 require_viewer();
 
-$brands = db()->query('SELECT b.*, (SELECT COUNT(*) FROM recipes r WHERE r.brand_id = b.id AND r.published = 1) AS n FROM brands b ORDER BY b.sort, b.name')->fetchAll();
-$brandId = (int)($_GET['brand'] ?? 0);
-$q = trim((string)($_GET['q'] ?? ''));
+// Old links and bookmarks to the library (/?brand=3, /?q=katsu) still work.
+if (isset($_GET['brand']) || isset($_GET['q'])) {
+    redirect(base_url('recipes.php?' . http_build_query(array_intersect_key($_GET, ['brand' => 1, 'q' => 1]))));
+}
 
-$sql = 'SELECT r.id, r.code, r.name, r.description, r.image, r.prep_minutes, r.cook_minutes, r.yield_text,
-               b.name AS brand_name, b.colour,
-               (SELECT COUNT(*) FROM steps s WHERE s.recipe_id = r.id) AS step_count
-        FROM recipes r LEFT JOIN brands b ON b.id = r.brand_id
-        WHERE r.published = 1';
-$args = [];
-if ($brandId) { $sql .= ' AND r.brand_id = ?'; $args[] = $brandId; }
-if ($q !== '') { $sql .= ' AND (r.name LIKE ? OR r.code LIKE ? OR r.description LIKE ?)'; array_push($args, "%$q%", "%$q%", "%$q%"); }
-$sql .= ' ORDER BY b.sort, b.name, r.code, r.name';
-$st = db()->prepare($sql);
-$st->execute($args);
-$recipes = $st->fetchAll();
-$total = (int)db()->query('SELECT COUNT(*) FROM recipes WHERE published = 1')->fetchColumn();
+$nRecipes = (int)db()->query('SELECT COUNT(*) FROM recipes WHERE published = 1')->fetchColumn();
+$nBrands = (int)db()->query('SELECT COUNT(DISTINCT brand_id) FROM recipes WHERE published = 1 AND brand_id IS NOT NULL')->fetchColumn();
+$photos = db()->query('SELECT image, name FROM recipes WHERE published = 1 AND image IS NOT NULL ORDER BY updated_at DESC LIMIT 3')->fetchAll();
+$nLabels = (int)db()->query('SELECT COUNT(*) FROM label_items WHERE active = 1')->fetchColumn();
+$kinds = db()->query('SELECT kind, COUNT(*) AS n FROM label_items WHERE active = 1 GROUP BY kind')->fetchAll(PDO::FETCH_KEY_PAIR);
 
-page_head('Recipes');
-kitchen_top();
+page_head('Start', 'start-page');
 ?>
-<main class="wrap" id="main">
-  <form class="find" method="get" role="search">
-    <?php if ($brandId): ?><input type="hidden" name="brand" value="<?= $brandId ?>"><?php endif; ?>
-    <div class="search">
-      <?= icon('search') ?>
-      <label class="sr" for="q">Search recipes</label>
-      <input id="q" name="q" type="search" value="<?= e($q) ?>" placeholder="Search by dish name or code" autocomplete="off" data-live-search>
+<main class="start" id="main">
+  <header class="start-h">
+    <span class="mark-box big"><?= mark_svg() ?></span>
+    <div>
+      <h1><?= e(kitchen_name()) ?></h1>
+      <p class="today"><time data-clock><?= e(date('l j F, H:i')) ?></time></p>
     </div>
-  </form>
+  </header>
 
-  <?php if ($brands): ?>
-  <nav class="brands" aria-label="Brands">
-    <a class="chip" href="<?= e(base_url($q !== '' ? '?q=' . rawurlencode($q) : '')) ?>" aria-current="<?= $brandId ? 'false' : 'true' ?>">All brands</a>
-    <?php foreach ($brands as $b): ?>
-      <a class="chip" style="--c: <?= e($b['colour']) ?>" href="?brand=<?= (int)$b['id'] ?><?= $q !== '' ? '&q=' . rawurlencode($q) : '' ?>" aria-current="<?= $brandId === (int)$b['id'] ? 'true' : 'false' ?>">
-        <i></i><?= e($b['name']) ?>
-      </a>
-    <?php endforeach; ?>
-  </nav>
-  <?php endif; ?>
+  <h2 class="start-q">What do you need?</h2>
 
-  <?php if (!$total): ?>
-    <div class="empty">
-      <h2>No recipes yet</h2>
-      <p>Recipes added in the admin panel appear here for the whole kitchen.</p>
-      <?php if (is_admin()): ?><a class="btn btn-primary" href="<?= e(base_url('admin/recipe-edit.php')) ?>"><?= icon('plus') ?>Add the first recipe</a><?php endif; ?>
-    </div>
-  <?php else: ?>
-    <p class="count" id="count" aria-live="polite"><?= count($recipes) ?> <?= count($recipes) === 1 ? 'recipe' : 'recipes' ?></p>
-    <?php
-      // Group by brand when showing everything, so a long menu is easy to scan.
-      $groups = [];
-      foreach ($recipes as $r) $groups[$brandId ? '' : (string)$r['brand_name']][] = $r;
-      $showHeads = !$brandId && count($groups) > 1;
-    ?>
-    <div id="grid">
-      <?php foreach ($groups as $gName => $items): ?>
-      <section class="group" data-group>
-        <?php if ($showHeads): ?><h2 class="group-h" style="--c: <?= e($items[0]['colour'] ?: '#01216C') ?>"><?= e($gName !== '' ? $gName : 'Other recipes') ?> <span><?= count($items) ?></span></h2><?php endif; ?>
-        <div class="grid">
-          <?php foreach ($items as $r): ?>
-            <a class="tile" style="--c: <?= e($r['colour'] ?: '#01216C') ?>" href="recipe.php?id=<?= (int)$r['id'] ?>"
-               data-search="<?= e(mb_strtolower($r['name'] . ' ' . $r['code'] . ' ' . $r['brand_name'])) ?>">
-              <div class="ph"><?= pic($r['image'], $r['name'], 'Photo to come', true) ?></div>
-              <div class="body">
-                <span class="code"><?= e($r['code']) ?><?php if (!$showHeads && !$brandId && $r['brand_name']): ?><span class="br"><?= e($r['brand_name']) ?></span><?php endif; ?></span>
-                <h3><?= e($r['name']) ?></h3>
-                <div class="meta">
-                  <?php $mins = (int)$r['prep_minutes'] + (int)$r['cook_minutes']; if ($mins): ?><span><?= e(fmt_minutes($mins)) ?></span><?php endif; ?>
-                  <span><?= e(plural((int)$r['step_count'], 'step')) ?></span>
-                  <?php if ($r['yield_text']): ?><span>Makes <?= e($r['yield_text']) ?></span><?php endif; ?>
-                </div>
-              </div>
-            </a>
-          <?php endforeach; ?>
+  <div class="choices">
+    <a class="choice choice-recipes" href="<?= e(base_url('recipes.php')) ?>">
+      <div class="choice-art" aria-hidden="true">
+        <?php if ($photos): ?>
+          <?php foreach ($photos as $p): ?><img src="<?= e(thumb_url($p['image'])) ?>" alt="" loading="lazy" decoding="async"><?php endforeach; ?>
+        <?php else: ?>
+          <span class="choice-icon"><?= icon('book') ?></span>
+        <?php endif; ?>
+      </div>
+      <div class="choice-body">
+        <h3>Recipes</h3>
+        <p>What you need, photos and step by step for every dish.</p>
+        <span class="choice-meta"><?= e(plural($nRecipes, 'recipe')) ?><?= $nBrands > 1 ? ' · ' . e(plural($nBrands, 'brand')) : '' ?></span>
+      </div>
+      <span class="choice-go"><?= icon('arrow') ?></span>
+    </a>
+
+    <a class="choice choice-labels" href="<?= e(base_url('labels.php')) ?>">
+      <div class="choice-art" aria-hidden="true">
+        <div class="mini-label">
+          <b><?= e(mb_substr(kitchen_name(), 0, 22)) ?></b>
+          <span>Made <?= e(date('D d/m H:i')) ?></span>
+          <strong>USE BY <em><?= e(date('D d/m', strtotime('+2 days'))) ?></em></strong>
         </div>
-      </section>
-      <?php endforeach; ?>
-    </div>
-    <div class="empty" id="noMatch" <?= $recipes ? 'hidden' : '' ?>>
-      <h2>No recipe matches that search</h2>
-      <p>Try the dish code from the ticket, or pick "All brands".</p>
-    </div>
-  <?php endif; ?>
+      </div>
+      <div class="choice-body">
+        <h3>Labels</h3>
+        <p>Print use-by labels for anything made, opened or defrosted.</p>
+        <span class="choice-meta">
+          <?php if ($nLabels): ?>
+            <?= e(plural($nLabels, 'item')) ?><?php foreach (LABEL_KINDS as $k => $l) if (!empty($kinds[$k]) && $k !== 'made') echo ' · ' . (int)$kinds[$k] . ' ' . e(strtolower($l)); ?>
+          <?php else: ?>
+            No label items yet: a manager adds them in the admin
+          <?php endif; ?>
+        </span>
+      </div>
+      <span class="choice-go"><?= icon('arrow') ?></span>
+    </a>
+  </div>
+
+  <footer class="start-f">
+    <button class="btn install-btn" type="button" data-install hidden><?= icon('download') ?><span>Install app on this tablet</span></button>
+    <?= admin_link('btn btn-ghost admin-link') ?>
+  </footer>
 </main>
-<?php lightbox_markup(); page_foot();
+<?php page_foot();

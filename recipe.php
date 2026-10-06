@@ -17,7 +17,7 @@ page_head($r['name']);
 kitchen_top();
 ?>
 <main class="wrap" id="main" style="--c: <?= e($r['brand_colour'] ?: '#01216C') ?>">
-  <a class="back" href="<?= e(base_url($r['brand_id'] ? '?brand=' . (int)$r['brand_id'] : '')) ?>"><?= icon('back') ?>All recipes</a>
+  <a class="back" href="<?= e(base_url('recipes.php' . ($r['brand_id'] ? '?brand=' . (int)$r['brand_id'] : ''))) ?>"><?= icon('back') ?>All recipes</a>
   <?php if (!$r['published']): ?><div class="alert bad">Hidden from the kitchen. Only admins can see this recipe.</div><?php endif; ?>
 
   <section class="rhead">

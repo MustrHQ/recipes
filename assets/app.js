@@ -227,6 +227,15 @@
     if (e.target.closest('[data-print]')) window.print();
   }, true);
 
+  // Live clock on the start screen (handy when writing labels).
+  var clock = $('[data-clock]');
+  if (clock) {
+    var tick = function () {
+      clock.textContent = new Date().toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).replace(' at ', ', ');
+    };
+    tick(); setInterval(tick, 15000);
+  }
+
   // "Select all" boxes in tables.
   document.addEventListener('change', function (e) {
     var all = e.target.closest('[data-check-all]');

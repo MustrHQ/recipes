@@ -50,7 +50,7 @@ page_head('Sign in');
       <div class="f"><label for="email">Email</label><input type="email" id="email" name="email" value="<?= e($email) ?>" autocomplete="username" required autofocus></div>
       <div class="f"><label for="password">Password</label><input type="password" id="password" name="password" autocomplete="current-password" required></div>
       <button class="btn btn-primary btn-big" type="submit">Sign in</button>
-      <a class="small" href="<?= e(base_url()) ?>">Go to the recipes</a>
+      <a class="small" href="<?= e(base_url()) ?>">Back to the kitchen screens</a>
     </form>
   </section>
 </main>

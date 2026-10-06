@@ -14,6 +14,10 @@ Part of the [MustrHQ](https://mustrhq.app) open-source set, alongside
 [MustrHQ Rota](https://github.com/MustrHQ/rota) and [MustrHQ Stock](https://github.com/MustrHQ/stock).
 
 <p align="center">
+  <img src="docs/screenshots/00-start.png" alt="The start screen on a kitchen tablet: What do you need? Recipes or Labels" width="760">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/03-step-by-step.png" alt="Step-by-step mode on a kitchen tablet: step 4 of 6, slice the chicken on the red board" width="760">
 </p>
 
@@ -27,10 +31,11 @@ Built for delivery-only ("dark") kitchens running several brands from one team, 
 useful in cafés, bakeries and restaurants. Every cook builds every dish the same way, including
 the new starter on their first shift.
 
-**On the kitchen tablet**
+**On the kitchen tablet** (no account needed; just the kitchen code, if you set one)
 
 | Screen | What it is |
 |---|---|
+| Start | "What do you need?": **Recipes** or **Labels**, with today's date and time. Managers sign in to the admin from here. |
 | Recipe library | Every dish as a photo tile, grouped by brand. Search by name or ticket code as you type. |
 | Recipe page | The finished photo, timings, allergens and diet tags, a safety note, **What you need** and the method. |
 | What you need | Every ingredient with its photo and amount. Batch buttons (½× to 4×) scale the amounts; tap to tick an ingredient off. |
@@ -214,8 +219,9 @@ upgrades itself on the next page load.
 ## Files
 
 ```
-index.php            recipe library
 recipe.php           recipe page
+index.php            start screen: Recipes or Labels
+recipes.php          recipe library
 cook.php             step-by-step mode
 labels.php           use-by labels
 unlock.php           kitchen code screen
