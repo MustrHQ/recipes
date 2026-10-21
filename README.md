@@ -25,6 +25,16 @@ Part of the [MustrHQ](https://mustrhq.app) open-source set, alongside
 upload it to your hosting, open the folder in your browser and follow the installer.
 Full details under [Install](#install).
 
+## New in 1.4.6
+
+- **Import images from cPanel:** put image ZIPs in the protected `backups/image-inbox/` folder, then import or resume from **Admin → Import and export**. The original archives are kept.
+- **Image-only imports:** match photos to existing dishes, ingredients and steps while preserving recipe text. Unmatched files are reported.
+- **Resumable uploads:** pause and continue uploads in the same signed-in browser, with bounded retries for temporary connection failures.
+- **Import diagnostics:** download a private report when an upload, validation or import fails.
+- **Bulk recipe deletion:** confirm the recipe count and phrase before deleting in resumable batches; brands and labels are kept. Back up first.
+
+Read the [import and deletion guide](IMPORT-AND-DELETE.md), [cPanel image import details](docs/server-image-import.md), [resumable upload guide](docs/resumable-uploads.md) and [release history](CHANGELOG.md).
+
 ## What it does
 
 Built for delivery-only ("dark") kitchens running several brands from one team, and just as
