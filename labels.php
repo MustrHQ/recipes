@@ -25,12 +25,14 @@ $data = [
         'id' => (int)$i['id'],
         'name' => $i['name'],
         'brand' => $i['brand_name'] ?: kitchen_name(),
+        'colour' => $i['colour'] ?: '#01216C',
         'kind' => $i['kind'],
         'kindLabel' => LABEL_KINDS[$i['kind']] ?? 'Made',
         'value' => (int)$i['shelf_value'],
         'unit' => $i['shelf_unit'],
         'storage' => $i['storage'],
         'supplier' => (bool)$i['ask_supplier'],
+        'photo' => ($i['image'] ?: $i['recipe_image']) ? thumb_url($i['image'] ?: $i['recipe_image']) : '',
         'allergens' => array_values(array_map(fn($k) => ALLERGENS[$k] ?? $k, csv_list($i['allergens'] !== '' ? $i['allergens'] : (string)$i['recipe_allergens']))),
     ], $items),
 ];
@@ -68,7 +70,12 @@ kitchen_top('labels', $printerChip);
 
   <div id="grid" class="lgrid">
     <?php foreach ($items as $i): ?>
+      <?php $photo = $i['image'] ?: $i['recipe_image']; ?>
       <article class="lcard" style="--c: <?= e($i['colour'] ?: '#01216C') ?>" data-search="<?= e(mb_strtolower($i['name'] . ' ' . $i['brand_name'])) ?>" data-brand-id="<?= (int)$i['brand_id'] ?>">
+        <button class="lphoto" type="button" data-label="<?= (int)$i['id'] ?>" tabindex="-1" aria-hidden="true">
+          <?php if ($photo): ?><img src="<?= e(thumb_url($photo)) ?>" alt="" loading="lazy" decoding="async">
+          <?php else: ?><span class="lphoto-none"><?= e(label_initials($i['name'])) ?></span><?php endif; ?>
+        </button>
         <div class="lcard-top">
           <span class="kind kind-<?= e($i['kind']) ?>"><?= e(LABEL_KINDS[$i['kind']] ?? 'Made') ?></span>
           <?php if ($i['brand_name']): ?><span class="lbrand"><?= e($i['brand_name']) ?></span><?php endif; ?>
@@ -88,7 +95,8 @@ kitchen_top('labels', $printerChip);
   <div class="modal-scrim" data-close></div>
   <div class="modal-box lmodal">
     <header class="modal-h">
-      <div>
+      <span class="lm-photo" id="lmPhoto" aria-hidden="true"></span>
+      <div class="lm-head">
         <span class="kind" id="lmKind"></span>
         <h2 id="lmTitle"></h2>
         <p class="muted" id="lmShelf"></p>

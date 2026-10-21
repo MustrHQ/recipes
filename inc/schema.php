@@ -84,6 +84,7 @@ return [
         shelf_unit ENUM('hours','days') NOT NULL DEFAULT 'days',
         storage VARCHAR(60) NOT NULL DEFAULT '',
         allergens VARCHAR(255) NOT NULL DEFAULT '',
+        image VARCHAR(80) NULL,
         ask_supplier TINYINT(1) NOT NULL DEFAULT 0,
         active TINYINT(1) NOT NULL DEFAULT 1,
         sort INT NOT NULL DEFAULT 0,

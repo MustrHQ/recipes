@@ -121,7 +121,7 @@ defrosted. Each item has a shelf life in **days** or **hours**, a storage line a
 Link an item to a recipe and the recipe gets a **Print label** button. **Add labels for every
 recipe** does that for all of them in one go.
 
-On the tablet, **Labels** shows every item with its shelf life. Tap **Print label**, choose *Now*,
+On the tablet, **Labels** shows every item with its photo and shelf life, so the team can spot it quickly. Photos are only on the screen, never on the printed label. Add one in **Admin → Labels**; items linked to a recipe use the recipe's photo. Tap **Print label**, choose *Now*,
 *Earlier today* or *Yesterday* (or any date and time), add your initials, and the screen shows the
 use-by date and the exact label before it prints.
 

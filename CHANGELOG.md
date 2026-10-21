@@ -4,6 +4,114 @@ All notable changes to MustrHQ Recipes are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.6] - 2026-10-21
+
+### Added
+- **Import images from cPanel** in Admin > Import and export. ZIPs placed in the
+  protected `backups/image-inbox/` folder appear in the portal after refreshing.
+- One-click import into matching dish, ingredient and step slots. ZIPs are read
+  directly on the server, never uploaded through the portal or copied in full.
+- Persistent per-archive progress, Resume import and Import again controls, with
+  completion counts and unmatched filename lists. Original ZIPs are kept.
+
+### Safety and matching
+- Server imports use image-only mode even when a ZIP also contains recipes.json.
+- Admin access, CSRF tokens, locked job records and position checks protect each run.
+- Symlink/path traversal sources are rejected. Changed ZIPs or recipe placements
+  stop an existing run for rechecking rather than guessing another slot.
+
+## [1.4.5] - 2026-10-21
+
+### Added
+- Resumable uploads: reselect the same file in the same signed-in browser to
+  continue from the server's committed byte position. Pause and Start over controls.
+- Bounded automatic retries for transient connection/gateway failures during uploads.
+  Recipe application is never automatically retried.
+- Persisted upload receipts and a status endpoint. Repeated chunks are verified
+  against saved bytes, including after a lost final response.
+
+### Fixed
+- Retrying the first chunk no longer erases saved progress or appends duplicate data.
+- Incomplete, uncommitted writes are truncated to the last acknowledged boundary
+  before resending. Interrupted finalization can be completed through a status check.
+- Expired upload receipts are cleaned with the temporary import files after 24 hours.
+
+## [1.4.4] - 2026-10-21
+
+### Changed
+- Upload chunks are capped at 512 KB, with room for multipart overhead on smaller
+  hosting limits, instead of sending up to 8 MB per request.
+- The final upload request only finishes saving the file. ZIP validation runs in a
+  separate request, and normalized preview metadata is cached without image bytes.
+- Upload errors identify whether sending, validating or applying the pack failed.
+
+### Added
+- Private bounded import diagnostics with request IDs, request stages, elapsed time,
+  peak PHP memory and status. Admins can download the report from Import and export.
+- Fatal-memory and execution failures return a structured error when PHP can still
+  respond. A gateway failure before PHP runs cannot be captured by the application.
+
+## [1.4.3] - 2026-10-21
+
+### Added
+- Admin **Delete all recipes**: confirms the global count and typed phrase, deletes in
+  resumable batches, keeps brands and label records, and removes only unused pictures.
+- Dedicated **Import images only** upload. No recipes file is needed; JSON files inside
+  an image ZIP are ignored in this mode.
+- Image matching for native export filenames (`__dish`, `__step-1`, `__ing-1`) as well
+  as the supplied kitchen image sets. Preview lists each image's destination slot
+  and every unmatched filename.
+
+### Fixed
+- All upload forms use chunked uploads, including the new images-only form.
+- Duplicate image basenames and ambiguous recipe identities are rejected or skipped
+  instead of silently assigning a picture. Changed placement previews must be reviewed
+  again before applying pictures.
+
+## [1.4.2] - 2026-10-21
+
+### Added
+- Kitchen image-only ZIP import: matches existing recipes using the supplied kitchen reference map.
+  Updates image slots only; never overwrites instructions, ingredients, allergens or publication.
+  Step text must match the reference; unmatched images and unsupported utensils are reported.
+
+### Fixed
+- PharData import preview lists filenames without reading every photo into memory.
+- Browser import batches process one recipe per request, reducing timeout risk.
+- Non-JSON server failures explain that progress must be checked before restarting.
+
+## [1.4.1] - 2026-10-07
+
+### Fixed
+- **Pages looking broken after an update** (for example a huge arrow on the sign-in page). The
+  tablet app kept serving the previous release's stylesheet: it looked files up without their
+  version number, and when it refreshed them it could pick up the server's year-long cached copy.
+  Files are now cached by their exact versioned address and refreshed straight from the server.
+  Screens stuck on an old stylesheet repair themselves a moment after this update arrives, and
+  later updates show correctly on the first load. Pages where someone may be typing (the recipe
+  and label editors, import, settings, brands) are never reloaded under them.
+- Icons have a built-in size, so they can never fill the screen even if a stylesheet fails to load.
+
+### Changed
+- The sign-in page's "Kitchen screens" link is an outlined button, lined up with the form on
+  tablets in portrait.
+
+## [1.4.0] - 2026-10-06
+
+### Added
+- **Photos on the labels screen**, so the team can find an item at a glance. Each label card
+  shows the item's photo; tap the photo or **Print label**. The print window shows it too.
+  Photos are for the screen only: **the printed label is unchanged**.
+- In **Admin → Labels**, add, replace or remove a photo on any label item. Items linked to a
+  recipe use the recipe's photo until they have their own. Items with no photo show their
+  initials in the brand colour.
+- The example label items come with photos.
+
+### Fixed
+- Database upgrades after an update now run one at a time. The first page after an update loads
+  several pictures at once, and two requests could try the same upgrade step together; the
+  upgrade still finished, but the admin showed an alarming "upgrade stopped" message.
+
 ## [1.3.0] - 2026-10-06
 
 ### Fixed

@@ -26,7 +26,7 @@ if (isset($_GET['download'])) {
 if (isset($_GET['migrate'])) {
     try {
         $ran = run_migrations();
-        flash('Now running version ' . MUSTR_VERSION . '. ' . ($ran ? 'The database was upgraded.' : 'The database was already up to date.'));
+        flash('Now running version ' . MUSTR_VERSION . '. ' . 'The database is up to date.');
     } catch (Throwable $e) {
         flash('The files were updated, but the database upgrade stopped: ' . $e->getMessage() . ' Your recipes are untouched. Restore the app files backup below if something is not working.', 'bad');
     }

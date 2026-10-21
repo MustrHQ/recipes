@@ -94,11 +94,12 @@ function pack_slug(string $s): string
  *
  * Returns ['path', 'zip', 'recipes' => [...normalised...], 'images' => [...], 'problems', 'notes', 'source'].
  */
-function pack_read(string $path, string $originalName): array
+function pack_read(string $path, string $originalName, bool $imagesOnly = false): array
 {
     $images = [];
     $jsons = [];
     $isZip = strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) !== 'json';
+    if ($imagesOnly && !$isZip) throw new RuntimeException('For image-only import, upload a ZIP of pictures. No recipes.json is needed.');
     if (!$isZip) {
         $jsons[basename($originalName)] = (string)file_get_contents($path);
     } else {
@@ -106,9 +107,15 @@ function pack_read(string $path, string $originalName): array
             $base = basename($name);
             if (str_starts_with($name, '__MACOSX/') || $base === '' || $base[0] === '.') continue;
             if (preg_match('/\.json$/i', $base)) { $jsons[$name] = $name; continue; }
-            if (preg_match('/\.(jpe?g|png|webp|gif)$/i', $base)) $images[strtolower($base)] = $name;
+            if (preg_match('/\.(jpe?g|png|webp|gif)$/i', $base)) {
+                $key = strtolower($base);
+                if (isset($images[$key])) throw new RuntimeException('Two pictures use the same filename: ' . $base . '. Rename or remove the duplicate before importing.');
+                $images[$key] = $name;
+            }
         }
-        if (!$jsons) throw new RuntimeException('There is no recipes.json in that zip. A recipe pack needs recipes.json plus the photos it names.');
+        if ($imagesOnly && !$images) throw new RuntimeException('That ZIP has no supported pictures.');
+        if (($imagesOnly || !$jsons) && $images) return pack_read_images($path, $images);
+        if (!$jsons) throw new RuntimeException('This zip contains neither recipes.json nor supported pictures.');
         // Prefer recipes*.json; ignore other JSON files (schemas, notes) when recipes files exist.
         $rec = array_filter($jsons, fn($n) => preg_match('/(^|\/)(recipes|pack)[^\/]*\.json$/i', $n));
         if ($rec) $jsons = $rec;
@@ -319,7 +326,22 @@ function pack_zip_list(string $path): array
         $z->close();
         return $out;
     }
-    return array_keys(upd_read_zip($path));   // PharData fallback reads it all; fine for small packs
+    if (!class_exists('PharData')) throw new RuntimeException('Enable the PHP zip or phar extension to open packs.');
+    try {
+        $archive = new PharData($path);
+        $prefix = 'phar://' . str_replace('\\', '/', (string)realpath($path)) . '/';
+        $out = [];
+        foreach (new RecursiveIteratorIterator($archive) as $file) {
+            // List entry names only: never decompress the photos during preview.
+            if ($file->isDir()) continue;
+            $name = str_replace('\\', '/', $file->getPathname());
+            if (!str_starts_with($name, $prefix)) throw new RuntimeException('Invalid zip entry.');
+            $out[] = substr($name, strlen($prefix));
+        }
+        return $out;
+    } catch (Throwable $e) {
+        throw new RuntimeException('That file is not a readable zip.', 0, $e);
+    }
 }
 
 function pack_zip_get(string $path, string $entry): ?string
@@ -374,6 +396,15 @@ function pack_keys(mixed $list, array $known, array $aliases): array
 /** Work out what an import would do, without changing anything. */
 function pack_plan(array $pack): array
 {
+    if (!empty($pack['images_only'])) {
+        $rows = []; $photos = 0;
+        foreach ($pack['recipes'] as $id => $r) {
+            $count = count($r['bindings']); $photos += $count;
+            $rows[$id] = ['action' => 'update', 'existing_id' => $id, 'recipe' => $r,
+                'photos' => $count, 'photos_wanted' => $count, 'warnings' => $r['warnings']];
+        }
+        return ['rows' => $rows, 'new_brands' => [], 'photos' => $photos, 'photos_missing' => 0];
+    }
     $brands = [];
     foreach (db()->query('SELECT id, name FROM brands') as $b) $brands[strtolower($b['name'])] = (int)$b['id'];
     $rows = [];
@@ -428,6 +459,7 @@ function pack_find(?int $brandId, string $code, string $name): ?int
  */
 function pack_apply(array $pack, array $selected, array &$shared = []): array
 {
+    if (!empty($pack['images_only'])) return pack_apply_images($pack, $selected, $shared);
     $pdo = db();
     $saved = [];      // new photo files, removed again if the batch fails
     $toDelete = [];   // replaced photo files, removed once the batch succeeds
@@ -587,4 +619,25 @@ $example
 
 If the menu is long, do up to 10 recipes per reply, then wait for me to say "continue".
 MD;
+}
+
+require_once __DIR__ . "/image-transfer.php";
+
+/** Cache the normalized preview, never the image bytes. Uploaded source files are immutable. */
+function pack_preview_read(string $path, string $name, bool $imagesOnly = false, bool $refresh = false): array
+{
+    $cache = $path . '.cache.json';
+    $size = filesize($path); $mtime = filemtime($path);
+    if (!$refresh && is_file($cache)) {
+        $data = json_decode((string)file_get_contents($cache), true);
+        if (is_array($data) && ($data['size'] ?? null) === $size && ($data['mtime'] ?? null) === $mtime
+            && ($data['images_only'] ?? null) === $imagesOnly && isset($data['pack'])) return $data['pack'];
+    }
+    $pack = pack_read($path, $name, $imagesOnly);
+    $data = json_encode(['size' => $size, 'mtime' => $mtime, 'images_only' => $imagesOnly, 'pack' => $pack], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    // A failed cache write must not prevent importing a valid pack.
+    $tmp = $cache . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    if (@file_put_contents($tmp, $data, LOCK_EX) !== false) @rename($tmp, $cache);
+    @unlink($tmp);
+    return $pack;
 }

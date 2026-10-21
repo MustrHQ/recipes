@@ -411,11 +411,32 @@
   }
 
   /* ---------- Admin: big recipe packs (upload in parts, import in batches) ---------- */
-  var post = function (url, fd) {
-    return fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) {
-      return r.json().catch(function () { throw new Error('The server sent an unexpected reply (' + r.status + '). Try again.'); })
-        .then(function (j) { if (!r.ok || j.error) throw new Error(j.error || 'Something went wrong (' + r.status + ').'); return j; });
-    });
+  var post = function (url, fd, phase, timeout) {
+    var controller = timeout && window.AbortController ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, timeout) : null;
+    return fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', signal: controller ? controller.signal : undefined }).then(function (r) {
+      var requestId = r.headers.get('X-Mustr-Import-Request');
+      var context = phase ? phase + ': ' : '';
+      var fail = function (message) {
+        var error = new Error(context + message + (requestId ? ' Request ID: ' + requestId : ''));
+        error.status = r.status; error.retryable = [408, 425, 429, 502, 503, 504].indexOf(r.status) !== -1;
+        var after = r.headers.get('Retry-After');
+        error.retryAfter = after ? Math.max(0, Math.min(120000, /^\d+$/.test(after) ? Number(after) * 1000 : Date.parse(after) - Date.now())) : 0;
+        return error;
+      };
+      return r.json().catch(function () {
+        throw fail('The server returned HTTP ' + r.status + ' without a valid reply. Download import diagnostics from Import and export.');
+      }).then(function (j) {
+        if (!r.ok || j.error) throw fail(j.error || 'Request failed (HTTP ' + r.status + ').');
+        return j;
+      });
+    }).catch(function (error) {
+      if (error.status === undefined && (error.name === 'TypeError' || error.name === 'AbortError')) {
+        error.retryable = true; error.status = 0;
+        error.message = (phase ? phase + ': ' : '') + 'The connection was interrupted or timed out.';
+      }
+      throw error;
+    }).finally(function () { if (timer) clearTimeout(timer); });
   };
   var progress = function (form, frac, text) {
     var p = $('[data-progress]', form); if (!p) return;
@@ -423,28 +444,146 @@
   };
   var lock = function (form, on) { $$('button', form).forEach(function (b) { b.disabled = on; }); };
 
-  var up = $('form[data-chunked]');
-  if (up && window.fetch && window.FormData && Blob.prototype.slice) {
+  if (window.fetch && window.FormData && Blob.prototype.slice) $$('form[data-chunked]').forEach(function (up) {
+    var pause = $('[data-pause-upload]', up), restart = $('[data-restart-upload]', up), busy = false, paused = false;
+    if (pause) pause.addEventListener('click', function () { paused = true; pause.disabled = true; pause.textContent = 'Pausing…'; });
     up.addEventListener('submit', function (e) {
       var file = up.elements.pack.files[0]; if (!file) return;
-      e.preventDefault();
-      var size = parseInt(up.getAttribute('data-chunk'), 10), total = Math.max(1, Math.ceil(file.size / size)), i = 0;
-      var id = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
-      lock(up, true);
+      e.preventDefault(); if (busy) return;
+      if (!file.size) { alert('Choose a non-empty ZIP or recipe file.'); return; }
+      busy = true; paused = false;
+      var api = up.getAttribute('data-api'), mode = up.elements.import_mode ? up.elements.import_mode.value : 'recipes';
+      var key = 'mustr-upload-v1:' + JSON.stringify([api, mode, file.name, file.size, file.lastModified]);
+      var saved = null;
+      try { saved = JSON.parse(localStorage.getItem(key)); } catch (_) {}
+      if (!saved || !/^[a-f0-9]{16}$/.test(saved.id) || !(saved.chunkSize > 0 && saved.chunkSize <= 2097152)) saved = null;
+      var size = saved ? saved.chunkSize : parseInt(up.getAttribute('data-chunk'), 10);
+      var total = Math.max(1, Math.ceil(file.size / size)), i = 0, received = 0;
+      var makeId = function () { return Array.from(crypto.getRandomValues(new Uint8Array(8))).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); };
+      var id = saved ? saved.id : makeId();
+      var remember = function () { try { localStorage.setItem(key, JSON.stringify({ id: id, chunkSize: size })); } catch (_) {} };
+      var forget = function () { try { localStorage.removeItem(key); } catch (_) {} };
       var mb = function (n) { return (n / 1048576).toFixed(1) + ' MB'; };
+      lock(up, true);
+      if (restart) { restart.hidden = true; restart.onclick = function () { forget(); restart.hidden = true; progress(up, 0, 'Saved upload reference cleared. Submit this file to start a new upload.'); }; }
+      if (pause) { pause.hidden = false; pause.disabled = false; pause.textContent = 'Pause upload'; }
+      var release = function () { busy = false; lock(up, false); if (pause) pause.hidden = true; if (restart) restart.hidden = false; };
+      var pauseResult = function () { release(); progress(up, received / file.size, 'Upload paused. ' + mb(received) + ' saved. Select the same file and submit to resume.'); };
+      var retry = function (task, label, attempt) {
+        attempt = attempt || 0;
+        if (paused) return Promise.reject({ paused: true });
+        return task().catch(function (error) {
+          if (paused) throw { paused: true };
+          if (!error.retryable || attempt >= 5) throw error;
+          var delay = Math.max(error.retryAfter || 0, Math.min(32000, 2000 * Math.pow(2, attempt)));
+          progress(up, received / file.size, label + ' interrupted. Retrying in ' + Math.ceil(delay / 1000) + ' seconds (' + (attempt + 1) + '/5)…');
+          return new Promise(function (resolve) { setTimeout(resolve, delay); }).then(function () { return retry(task, label, attempt + 1); });
+        });
+      };
+      var validate = function () {
+        if (paused) { pauseResult(); return Promise.resolve(); }
+        if (pause) pause.hidden = true;
+        progress(up, 1, 'Upload complete. Checking the ZIP…');
+        var fd = new FormData(); fd.append('csrf', up.elements.csrf.value); fd.append('action', 'validate'); fd.append('upload_id', id);
+        return post(api, fd, 'Checking the uploaded file').then(function (checked) { forget(); location.href = checked.next; });
+      };
       var next = function () {
+        if (paused) { pauseResult(); return Promise.resolve(); }
         var fd = new FormData();
         fd.append('csrf', up.elements.csrf.value); fd.append('action', 'chunk'); fd.append('upload_id', id);
-        fd.append('index', i); fd.append('total', total); fd.append('name', file.name);
+        fd.append('index', i); fd.append('total', total); fd.append('name', file.name); fd.append('import_mode', mode);
+        fd.append('file_size', file.size); fd.append('chunk_size', size);
         fd.append('chunk', file.slice(i * size, (i + 1) * size), 'part');
-        progress(up, i / total, 'Sending ' + mb(Math.min(file.size, i * size)) + ' of ' + mb(file.size) + '…');
-        return post(up.getAttribute('data-api'), fd).then(function (j) {
-          i++;
-          if (j.done) { progress(up, 1, 'Checking the pack…'); location.href = j.next; return; }
+        progress(up, received / file.size, 'Sending ' + mb(received) + ' of ' + mb(file.size) + '…');
+        return retry(function () { return post(api, fd, 'Uploading part ' + (i + 1) + ' of ' + total, 60000); }, 'Upload').then(function (j) {
+          i = j.next_index; received = j.received_bytes;
+          if (j.done) return validate();
           return next();
         });
       };
-      next().catch(function (err) { lock(up, false); progress(up, 0, ''); alert(err.message); });
+      var start = function () { remember(); return next(); };
+      var job;
+      if (saved) {
+        var status = new FormData(); status.append('csrf', up.elements.csrf.value); status.append('action', 'upload_status'); status.append('upload_id', id);
+        progress(up, 0, 'Checking saved upload progress…');
+        job = retry(function () { return post(api, status, 'Resuming saved upload', 60000); }, 'Progress check').then(function (j) {
+          if (j.name !== file.name || j.file_size !== file.size || j.chunk_size !== size || j.images_only !== (mode === 'images')) throw new Error('The selected file does not match the saved upload.');
+          i = j.next_index; received = j.received_bytes;
+          return j.done ? validate() : next();
+        }).catch(function (error) {
+          if (error.status !== 410) throw error;
+          forget(); id = makeId(); i = 0; received = 0; return start();
+        });
+      } else job = start();
+      job.catch(function (error) {
+        if (error.paused) { pauseResult(); return; }
+        release();
+        progress(up, received / file.size, 'Upload interrupted. Saved progress is kept. Select the same file in this browser to resume.');
+        alert(error.message + ' Saved upload progress is kept; select the same file to resume.');
+      });
+    });
+  });
+
+  var serverImageBusy = false;
+  if (window.fetch && window.FormData) $$('form[data-server-image-import]').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      event.preventDefault(); if (serverImageBusy) return;
+      serverImageBusy = true;
+      var forms = $$('form[data-server-image-import]'); forms.forEach(function (f) { lock(f, true); });
+      var error = $('[data-server-error]', form), recheck = $('[data-server-recheck]', form), primary = $('[data-server-primary]', form);
+      var summary = $('[data-server-summary]', form), unmatched = $('[data-server-unmatched]', form);
+      var row = form.closest('tr'), status = $('[data-server-status]', row);
+      var api = form.getAttribute('data-api'), name = form.elements.name.value;
+      error.hidden = true; summary.hidden = true; status.textContent = 'Importing';
+      progress(form, 0, 'Checking the server ZIP and matching pictures…');
+      var show = function (state) {
+        progress(form, state.pos / Math.max(1, state.total), state.pos + ' of ' + state.total + ' recipes processed; ' + state.photos_saved + ' picture files saved…');
+        var files = state.unmatched_files || [], list = $('ul', unmatched); list.textContent = '';
+        files.forEach(function (name) { var item = document.createElement('li'); item.textContent = name; list.appendChild(item); });
+        $('[data-server-unmatched-count]', unmatched).textContent = files.length; unmatched.hidden = !files.length;
+        summary.textContent = state.recipes_updated + ' recipes updated; ' + state.matched_files + ' image files matched. Original ZIP kept.'; summary.hidden = false;
+        if (state.done) {
+          status.textContent = 'Imported'; primary.textContent = 'Import again'; primary.value = 'restart'; recheck.hidden = true;
+          progress(form, 1, 'Import complete.'); return Promise.resolve();
+        }
+        var fd = new FormData(); fd.append('csrf', form.elements.csrf.value); fd.append('name', name);
+        fd.append('action', 'server_next'); fd.append('token', state.token); fd.append('pos', state.pos);
+        return post(api, fd, 'Placing server images').then(show);
+      };
+      var fd = new FormData(); fd.append('csrf', form.elements.csrf.value); fd.append('name', name); fd.append('action', 'server_start');
+      fd.append('restart', event.submitter && event.submitter.value === 'restart' ? '1' : '0');
+      post(api, fd, 'Opening server image ZIP').then(show).catch(function (err) {
+        status.textContent = 'Incomplete'; primary.textContent = 'Resume import'; primary.value = 'resume'; recheck.hidden = false;
+        error.textContent = err.message + ' Completed recipes stay imported. Click Resume import, or Recheck and import if recipe instructions changed.'; error.hidden = false;
+      }).finally(function () { serverImageBusy = false; forms.forEach(function (f) { lock(f, false); }); });
+    });
+  });
+
+  var del = $('form[data-delete-recipes]');
+  if (del && window.fetch && window.FormData) {
+    var deleteToken = del.getAttribute('data-token') || '';
+    var deletePosition = parseInt(del.getAttribute('data-pos'), 10) || 0;
+    del.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var error = $('[data-delete-error]', del);
+      error.hidden = true;
+      lock(del, true);
+      var api = del.getAttribute('data-api');
+      var advance = function (state) {
+        deleteToken = state.token; deletePosition = state.pos;
+        progress(del, state.pos / state.total, 'Deleted ' + state.deleted + ' recipes; processed ' + state.pos + ' of ' + state.total + '…');
+        if (state.done) { location.href = del.getAttribute('data-next'); return Promise.resolve(); }
+        var fd = new FormData();
+        fd.append('csrf', del.elements.csrf.value); fd.append('action', 'delete_next');
+        fd.append('token', deleteToken); fd.append('pos', deletePosition);
+        return post(api, fd).then(advance);
+      };
+      var fd = new FormData(del);
+      if (deleteToken) { fd.set('action', 'delete_next'); fd.set('token', deleteToken); fd.set('pos', deletePosition); }
+      else fd.set('action', 'delete_start');
+      post(api, fd).then(advance).catch(function (err) {
+        lock(del, false); error.textContent = err.message + ' Reload this page to check progress and resume.'; error.hidden = false;
+      });
     });
   }
 
@@ -457,12 +596,12 @@
       var fd = new FormData(ap); fd.set('action', 'apply_start');
       var api = ap.getAttribute('data-api');
       lock(ap, true);
-      post(api, fd).then(function (j) {
+      post(api, fd, 'Starting recipe import').then(function (j) {
         var total = j.total;
         progress(ap, 0, 'Importing 0 of ' + total + ' recipes…');
         var step = function () {
           var f2 = new FormData(); f2.append('csrf', ap.elements.csrf.value); f2.append('action', 'apply_next');
-          return post(api, f2).then(function (r) {
+          return post(api, f2, 'Applying recipe pictures and details').then(function (r) {
             progress(ap, r.pos / r.total, 'Imported ' + r.pos + ' of ' + r.total + ' recipes, ' + r.photos + ' photos so far…');
             if (r.done) { location.href = r.next; return; }
             return step();

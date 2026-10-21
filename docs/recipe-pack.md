@@ -107,3 +107,40 @@ Packs from MustrHQ Station (`"format": "mustrhq-recipe-pack"`) import directly. 
 A step that names a single cooking time ("Simmer for 8 min") gets an 8-minute timer. Several
 `recipes*.json` files in one zip are merged in name order. Brand slugs follow Station's rule: lower
 case, `&` becomes `and`, anything else that is not a letter or number becomes `-`.
+
+
+## Kitchen image-only ZIPs (1.4.2)
+
+The existing Kitchen_All_Images_Small_Part_01.zip through Part_37.zip can now be
+uploaded directly without recipes.json. Existing recipes are required. A bundled
+kitchen reference map matches brand and code for dish pictures, exact instruction
+text for method pictures, and ingredient names for ready-item references.
+Only image columns are updated. Quantities, instructions, allergens, publication
+and all other recipe fields stay unchanged. Unmatched pictures are listed in the
+preview and skipped. Utensil pictures have no database slot and remain reference
+files in the original ZIP. This is specific to the supplied kitchen image set;
+arbitrary unrelated image filenames are not matched.
+
+Use the preview before importing. Recipe JSON imports still replace recipe fields;
+image-only mode applies only to a ZIP containing pictures and no JSON files.
+All supplied kitchen images are AI-generated references requiring chef review.
+
+
+## Separate image import (1.4.3)
+
+Choose **Import images only**, then upload a ZIP. This form ignores JSON entries,
+so it cannot replace recipe text even if recipes.json was accidentally included.
+Recipes must already exist. The preview expands to show each picture's destination
+slot and lists all unmatched filenames.
+
+Native export names also work without metadata: `brand__code__dish.png`,
+`brand__code__step-1.png`, `brand__code__ing-1.png`. JPEG, WebP and GIF extensions
+are supported too. Brand and code must match an existing recipe identity. Use the
+slugs from an export. Indexes are 1-based current step/ingredient positions; review
+these after reordering a recipe. Known kitchen reference step filenames use their
+reference instruction instead of assuming a numeric position.
+
+Duplicate basenames in different ZIP folders cause an error. Multiple pictures
+competing for one slot and duplicate recipe identities are skipped. Generic image
+imports never guess from visual content or a vague dish-name resemblance. If a
+recipe changes after preview, reload and review the placements again.

@@ -248,7 +248,9 @@ function upd_backups(): array
 /** Tidy away abandoned uploads (updates and imports) older than a day. */
 function upd_tidy(): void
 {
+    foreach (['import-*.part', 'import-*.upload.json', 'import-*.upload.lock', 'import-*.upload.json.*.tmp'] as $pattern) foreach (glob(upd_dir() . '/' . $pattern) ?: [] as $f) if (filemtime($f) < time() - 86400) @unlink($f);
     foreach (glob(upd_dir() . '/incoming-*.zip') ?: [] as $f) if (filemtime($f) < time() - 86400) @unlink($f);
+    foreach (glob(upd_dir() . '/import-*.cache.json') ?: [] as $f) if (filemtime($f) < time() - 86400) @unlink($f);
     foreach (glob(upd_dir() . '/import-*.zip') ?: [] as $f) if (filemtime($f) < time() - 86400) @unlink($f);
 }
 

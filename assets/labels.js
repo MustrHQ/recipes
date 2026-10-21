@@ -185,6 +185,11 @@
     if (!cur) return;
     qty = 1; $('#lmQty').textContent = '1';
     $('#lmTitle').textContent = cur.name;
+    var ph = $('#lmPhoto');
+    ph.innerHTML = '';
+    if (cur.photo) { var im = document.createElement('img'); im.src = cur.photo; im.alt = ''; ph.appendChild(im); }
+    else { ph.textContent = (cur.name.match(/[A-Za-z0-9]+/g) || ['?']).filter(function (w) { return ['and', 'of', 'the', 'with', 'in'].indexOf(w.toLowerCase()) < 0; }).slice(0, 3).map(function (w) { return w[0]; }).join('').toUpperCase(); }
+    ph.style.setProperty('--c', cur.colour || '#01216C');
     var k = $('#lmKind'); k.textContent = cur.kindLabel; k.className = 'kind kind-' + cur.kind;
     $('#lmShelf').textContent = cur.brand + ' · use within ' + cur.value + (cur.unit === 'hours' ? (cur.value === 1 ? ' hour' : ' hours') : (cur.value === 1 ? ' day' : ' days')) + (cur.storage ? ' · ' + cur.storage : '');
     $('#lmWhenLegend').textContent = 'When was it ' + cur.kindLabel.toLowerCase() + '?';

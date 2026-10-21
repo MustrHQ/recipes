@@ -73,6 +73,7 @@ admin_head('Recipes', 'recipes');
 ?>
 <div class="ahead">
   <h1>Recipes</h1>
+  <?php if ((int)$stats['total']): ?><a class="btn btn-danger" href="recipes-delete.php">Delete all recipes</a><?php endif; ?>
   <a class="btn btn-primary" href="recipe-edit.php<?= $brandId ? '?brand=' . $brandId : '' ?>"><?= icon('plus') ?>Add recipe</a>
 </div>
 <div class="stat-row">

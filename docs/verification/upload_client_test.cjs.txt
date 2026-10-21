@@ -1,0 +1,39 @@
+const fs=require('node:fs');const vm=require('node:vm');const assert=require('node:assert/strict');const {webcrypto}=require('node:crypto');
+const source=fs.readFileSync(process.argv[2]+'/assets/app.js','utf8');
+const code=source.slice(source.indexOf('  var post = function'),source.indexOf("  var del = $('form[data-delete-recipes]');"));
+async function runScenario(kind){
+ const storage=new Map(), requests=[], delays=[], notifications=[];let received=Buffer.alloc(0), cursor=0, committedLoss=false, preCommitLoss=false, failRemaining=kind==='resume'?6:0, validationFail=kind==='validate'?1:0, pausing=kind==='pause', finalLocation='';
+ const file={name:'pictures.zip',size:10,lastModified:1234,slice:(a,b)=>new Blob([Buffer.from('abcdefghij').subarray(a,b)])};
+ const progress={hidden:true,bar:{style:{}},p:{textContent:''}},pause={hidden:true,addEventListener:(n,f)=>pause.click=f},restart={hidden:true},submit={};
+ const form={elements:{csrf:{value:'csrf'},import_mode:{value:'images'},pack:{files:[file]}},getAttribute:n=>n==='data-api'?'/transfer-api.php':n==='data-chunk'?'4':null,addEventListener:(n,f)=>form.submit=f};
+ const response=(body,status=200)=>new Response(typeof body==='string'?body:JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
+ const fetch=async(url,opt)=>{
+  const fd=opt.body,action=fd.get('action');requests.push([action,fd.get('index')]);
+  if(action==='upload_status')return response({ok:true,name:file.name,file_size:10,chunk_size:4,images_only:true,total:3,next_index:cursor,received_bytes:received.length,done:cursor===3});
+  if(action==='validate'){if(validationFail-- >0)return response('<html>502</html>',502);return response({ok:true,next:'/preview'});}
+  assert.equal(action,'chunk');const index=Number(fd.get('index'));const bytes=Buffer.from(await fd.get('chunk').arrayBuffer());
+  if(kind==='retry'&&index===0&&!preCommitLoss){preCommitLoss=true;throw new TypeError('Network failed before reaching server');}
+  if(kind==='resume'&&index===1&&failRemaining-- >0)return response('<html>502</html>',502);
+  if(index===cursor){received=Buffer.concat([received,bytes]);cursor++;}else assert.ok(index<cursor,'only duplicate committed chunks may repeat');
+  if(kind==='retry'&&index===0&&!committedLoss){committedLoss=true;return response('<html>502</html>',502);}
+  if(pausing&&index===0){pausing=false;pause.click();}
+  return response({ok:true,next_index:cursor,received_bytes:received.length,done:cursor===3,needs_validation:cursor===3});
+ };
+ const context={window:{fetch,FormData,AbortController},fetch,FormData,Blob,AbortController,crypto:webcrypto,localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},location:{set href(v){finalLocation=v;}},alert:x=>notifications.push(x),setTimeout:(f,ms)=>{delays.push(ms);return ms>=60000?0:setTimeout(f,0);},clearTimeout,$:(q,el)=>q==='[data-progress]'?progress:q==='.bar i'?progress.bar:q==='p'?progress.p:q==='[data-pause-upload]'?pause:q==='[data-restart-upload]'?restart:null,$$:(q)=>q==='form[data-chunked]'?[form]:q==='button'?[submit,pause,restart]:[]};
+ vm.runInNewContext(code,context);
+ const wait=async test=>{for(let n=0;n<400;n++){if(test())return;await new Promise(r=>setTimeout(r,2));}throw Error('Client test timeout: '+kind+' '+progress.p.textContent);};
+ form.submit({preventDefault(){}});
+ if(kind==='resume'||kind==='validate'){
+  await wait(()=>notifications.length===1);assert.equal(storage.size,1,'keeps local resume record after bounded failure');const before=requests.length;
+  form.submit({preventDefault(){}});await wait(()=>finalLocation);
+  assert.equal(requests[before][0],'upload_status','resumed submission asks server for committed progress');
+  if(kind==='resume')assert.equal(requests.slice(before).find(x=>x[0]==='chunk')[1],'1','resume starts at next uncommitted chunk');
+  if(kind==='validate')assert.ok(!requests.slice(before).some(x=>x[0]==='chunk'),'validation resume does not resend completed upload');
+ }else if(kind==='pause'){
+  await wait(()=>progress.p.textContent.startsWith('Upload paused.'));assert.equal(cursor,1);assert.equal(storage.size,1);form.submit({preventDefault(){}});await wait(()=>finalLocation);
+ }else await wait(()=>finalLocation);
+ assert.equal(received.toString(),'abcdefghij','source bytes reconstructed exactly');assert.equal(finalLocation,'/preview');assert.equal(storage.size,0,'clears local resume record after validation');
+ if(kind==='retry'){assert.equal(requests.filter(x=>x[0]==='chunk'&&x[1]==='0').length,3);assert.ok(delays.includes(2000)&&delays.includes(4000));}
+ console.log('PASS browser upload logic:',kind);
+}
+(async()=>{for(const test of ['retry','resume','validate','pause'])await runScenario(test);})().catch(e=>{console.error(e);process.exit(1);});

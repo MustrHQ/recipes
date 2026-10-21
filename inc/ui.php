@@ -40,7 +40,7 @@ function icon(string $name): string
         'print' => '<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2"/><rect x="6" y="14" width="12" height="7"/>',
     ][$name] ?? '';
     $fill = $name === 'play' ? 'currentColor' : 'none';
-    return '<svg viewBox="0 0 24 24" fill="' . $fill . '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $p . '</svg>';
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="' . $fill . '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $p . '</svg>';
 }
 
 /** Photo, or a striped placeholder telling the team a photo is still to come. */

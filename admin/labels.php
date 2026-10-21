@@ -5,6 +5,13 @@ require __DIR__ . '/../inc/ui.php';
 require __DIR__ . '/../inc/admin.php';
 require_admin();
 
+function label_image(int $id): ?string
+{
+    $st = db()->prepare('SELECT image FROM label_items WHERE id = ?');
+    $st->execute([$id]);
+    return ($v = $st->fetchColumn()) ? (string)$v : null;
+}
+
 $self = base_url('admin/labels.php');
 $brands = db()->query('SELECT id, name FROM brands ORDER BY sort, name')->fetchAll();
 
@@ -13,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'save') {
+        if (empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) { flash('The photo is bigger than your server accepts.', 'bad'); redirect($self); }
         $id = (int)($_POST['id'] ?? 0);
         $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 120);
         $recipeId = (int)($_POST['recipe_id'] ?? 0) ?: null;
@@ -23,25 +31,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($name === '') { flash('Give the item a name, or link it to a recipe.', 'bad'); redirect($self . ($id ? '?id=' . $id : '?new=1')); }
         $value = max(1, min(999, (int)($_POST['shelf_value'] ?? 1)));
+        // Photo: only for finding the item on the tablet. It is never printed.
+        $old = $id ? label_image($id) : null;
+        $image = !empty($_POST['image_rm']) ? null : $old;
+        $photoNote = '';
+        try { if ($new = save_upload($_FILES['image'] ?? ['error' => UPLOAD_ERR_NO_FILE])) $image = $new; }
+        catch (RuntimeException $ex) { $photoNote = ' The photo was not saved: ' . $ex->getMessage(); }
         $fields = [
             (int)($_POST['brand_id'] ?? 0) ?: null, $recipeId, $name,
             array_key_exists($_POST['kind'] ?? '', LABEL_KINDS) ? $_POST['kind'] : 'made',
             $value, ($_POST['shelf_unit'] ?? '') === 'hours' ? 'hours' : 'days',
             mb_substr(trim((string)($_POST['storage'] ?? '')), 0, 60),
-            implode(',', array_intersect(array_keys(ALLERGENS), (array)($_POST['allergens'] ?? []))),
+            implode(',', array_intersect(array_keys(ALLERGENS), (array)($_POST['allergens'] ?? []))), $image,
             isset($_POST['ask_supplier']) ? 1 : 0, isset($_POST['active']) ? 1 : 0, (int)($_POST['sort'] ?? 0),
         ];
         if ($id) {
-            db()->prepare('UPDATE label_items SET brand_id=?, recipe_id=?, name=?, kind=?, shelf_value=?, shelf_unit=?, storage=?, allergens=?, ask_supplier=?, active=?, sort=? WHERE id=?')->execute([...$fields, $id]);
+            db()->prepare('UPDATE label_items SET brand_id=?, recipe_id=?, name=?, kind=?, shelf_value=?, shelf_unit=?, storage=?, allergens=?, image=?, ask_supplier=?, active=?, sort=? WHERE id=?')->execute([...$fields, $id]);
         } else {
-            db()->prepare('INSERT INTO label_items (brand_id, recipe_id, name, kind, shelf_value, shelf_unit, storage, allergens, ask_supplier, active, sort) VALUES (?,?,?,?,?,?,?,?,?,?,?)')->execute($fields);
+            db()->prepare('INSERT INTO label_items (brand_id, recipe_id, name, kind, shelf_value, shelf_unit, storage, allergens, image, ask_supplier, active, sort) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')->execute($fields);
         }
-        flash('Saved ' . $name . '.');
+        if ($old && $old !== $image) delete_upload_if_unused($old);
+        flash('Saved ' . $name . '.' . $photoNote, $photoNote ? 'bad' : 'ok');
         redirect($self);
     }
 
     if ($action === 'delete') {
+        $old = label_image((int)($_POST['id'] ?? 0));
         db()->prepare('DELETE FROM label_items WHERE id = ?')->execute([(int)($_POST['id'] ?? 0)]);
+        delete_upload_if_unused($old);
         flash('Label item deleted.');
         redirect($self);
     }
@@ -75,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$items = db()->query('SELECT l.*, b.name AS brand_name, b.colour, r.name AS recipe_name FROM label_items l LEFT JOIN brands b ON b.id = l.brand_id LEFT JOIN recipes r ON r.id = l.recipe_id ORDER BY b.sort, b.name, l.sort, l.name')->fetchAll();
+$items = db()->query('SELECT l.*, b.name AS brand_name, b.colour, r.name AS recipe_name, r.image AS recipe_image FROM label_items l LEFT JOIN brands b ON b.id = l.brand_id LEFT JOIN recipes r ON r.id = l.recipe_id ORDER BY b.sort, b.name, l.sort, l.name')->fetchAll();
 $recipes = db()->query('SELECT r.id, r.name, r.code, r.brand_id, r.allergens, b.name AS brand_name FROM recipes r LEFT JOIN brands b ON b.id = r.brand_id ORDER BY b.sort, b.name, r.code, r.name')->fetchAll();
 $missing = (int)db()->query('SELECT COUNT(*) FROM recipes r WHERE r.published = 1 AND NOT EXISTS (SELECT 1 FROM label_items l WHERE l.recipe_id = r.id)')->fetchColumn();
 
@@ -86,7 +103,7 @@ if (isset($_GET['id'])) {
     $edit = $st->fetch() ?: null;
 } elseif (isset($_GET['new'])) {
     $edit = ['id' => 0, 'brand_id' => null, 'recipe_id' => (int)($_GET['recipe'] ?? 0) ?: null, 'name' => '', 'kind' => 'made', 'shelf_value' => 2, 'shelf_unit' => 'days',
-             'storage' => 'Chilled 0–5 °C', 'allergens' => '', 'ask_supplier' => 0, 'active' => 1, 'sort' => 0];
+             'storage' => 'Chilled 0–5 °C', 'allergens' => '', 'image' => null, 'ask_supplier' => 0, 'active' => 1, 'sort' => 0];
     if ($edit['recipe_id']) {
         foreach ($recipes as $r) if ((int)$r['id'] === $edit['recipe_id']) { $edit['name'] = $r['name']; $edit['brand_id'] = $r['brand_id']; }
     }
@@ -103,7 +120,7 @@ admin_head('Labels', 'labels');
 <p class="lede">Each item has a shelf life. On the tablet, staff pick the item and say when it was made or opened; the screen works out the use-by date and prints the label. For days, the day it was made counts as day 1.</p>
 
 <?php if ($edit): $al = csv_list($edit['allergens']); ?>
-<form method="post" class="card form" id="editor" style="margin-bottom: 20px" data-label-editor>
+<form method="post" enctype="multipart/form-data" class="card form" id="editor" style="margin-bottom: 20px" data-label-editor>
   <?= csrf_field() ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>">
   <div class="card-h"><h2><?= $edit['id'] ? 'Edit ' . e($edit['name']) : 'New label item' ?></h2></div>
   <div class="fgrid">
@@ -131,6 +148,10 @@ admin_head('Labels', 'labels');
     <div class="f s3"><span class="lbl">On the tablet</span>
       <div class="checks"><label><input type="checkbox" name="active" value="1" <?= $edit['active'] ? 'checked' : '' ?>> Show</label><label><input type="checkbox" name="ask_supplier" value="1" <?= $edit['ask_supplier'] ? 'checked' : '' ?>> Ask for the supplier's date</label></div>
       <small>With the supplier's date, the label uses whichever date is sooner.</small>
+    </div>
+    <div class="f"><span class="lbl">Photo on the tablet</span>
+      <?= image_field('image', 'image_keep', 'image_rm', $edit['image'], 'Photo of the item') ?>
+      <small>Helps the team find the item at a glance. It is not printed on the label. Linked items use the recipe's photo when this is empty.</small>
     </div>
     <div class="f"><span class="lbl">Allergens</span>
       <div class="checks"><?php foreach (ALLERGENS as $k => $l): ?><label><input type="checkbox" name="allergens[]" value="<?= $k ?>" <?= in_array($k, $al, true) ? 'checked' : '' ?>> <?= e($l) ?></label><?php endforeach; ?></div>
@@ -166,10 +187,11 @@ admin_head('Labels', 'labels');
 <?php else: ?>
 <div class="scroll-x">
 <table class="list">
-  <thead><tr><th>Item</th><th>Brand</th><th>Use within</th><th>Storage</th><th>On tablet</th><th><span class="sr">Actions</span></th></tr></thead>
+  <thead><tr><th class="th"><span class="sr">Photo</span></th><th>Item</th><th>Brand</th><th>Use within</th><th>Storage</th><th>On tablet</th><th><span class="sr">Actions</span></th></tr></thead>
   <tbody>
   <?php foreach ($items as $i): ?>
     <tr>
+      <td class="th"><?= pic($i['image'] ?: $i['recipe_image'], '', '', true) ?></td>
       <td><strong><?= e($i['name']) ?></strong><br><span class="kind kind-<?= e($i['kind']) ?>"><?= e(LABEL_KINDS[$i['kind']] ?? 'Made') ?></span><?php if ($i['recipe_name']): ?> <span class="small muted">linked to recipe</span><?php endif; ?></td>
       <td><?= e($i['brand_name'] ?? 'Kitchen name') ?></td>
       <td class="nowrap"><strong><?= e(fmt_shelf((int)$i['shelf_value'], $i['shelf_unit'])) ?></strong></td>

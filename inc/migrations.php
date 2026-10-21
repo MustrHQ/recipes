@@ -36,4 +36,7 @@ return [
             CONSTRAINT fk_label_recipe FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
     ],
+    4 => [    // 1.4.0: a photo for each label item, shown on the labels screen (never printed)
+        "ALTER TABLE label_items ADD COLUMN image VARCHAR(80) NULL AFTER allergens",
+    ],
 ];

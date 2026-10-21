@@ -1,0 +1,23 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(process.argv[2]+'/assets/app.js','utf8');
+const code=source.slice(source.indexOf('  var post = function'),source.indexOf("  var del = $('form[data-delete-recipes]');"));
+async function scenario(fail){
+ let statePos=0,failed=false;const calls=[];
+ const progress={hidden:true,bar:{style:{}},p:{textContent:''}},error={hidden:true,textContent:''},primary={value:'resume'},recheck={hidden:true},summary={hidden:true},count={},status={},list={children:[],set textContent(v){this.children=[];},appendChild(v){this.children.push(v);}},unmatched={hidden:true};
+ const row={};const form={elements:{csrf:{value:'csrf'},name:{value:'Server.zip'}},getAttribute:()=>'/admin/server-images-api.php',addEventListener:(name,fn)=>form.submit=fn,closest:()=>row};
+ const reply=()=>({ok:true,token:'job',name:'Server.zip',pos:statePos,total:2,done:statePos===2,recipes_updated:statePos,photos_saved:statePos*2,matched_files:4,unmatched_files:['<img src=x onerror=alert(1)>.png']});
+ const fetch=async(url,opt)=>{const fd=opt.body,action=fd.get('action');calls.push([action,fd.get('pos')]);assert.equal(fd.has('chunk'),false,'server imports never resend ZIP bytes');
+  if(action==='server_start'){if(fd.get('restart')==='1')statePos=0;return new Response(JSON.stringify(reply()));}
+  assert.equal(action,'server_next');if(fail&&!failed&&statePos===1){failed=true;return new Response('<html>502</html>',{status:502});}
+  if(Number(fd.get('pos'))===statePos)statePos++;return new Response(JSON.stringify(reply()));};
+ const $=(q,el)=>q==='[data-progress]'?progress:q==='.bar i'?progress.bar:q==='p'?progress.p:q==='[data-server-error]'?error:q==='[data-server-recheck]'?recheck:q==='[data-server-primary]'?primary:q==='[data-server-summary]'?summary:q==='[data-server-unmatched]'?unmatched:q==='[data-server-status]'?status:q==='ul'?list:q==='[data-server-unmatched-count]'?count:null;
+ const context={window:{fetch,FormData},fetch,FormData,Blob,$,$$:q=>q==='form[data-server-image-import]'?[form]:q==='button'?[primary,recheck]:[],document:{createElement:()=>({textContent:''})},setTimeout,clearTimeout,console};vm.runInNewContext(code,context);
+ const wait=async fn=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,2));}throw Error('Timed out');};
+ form.submit({preventDefault(){},submitter:{value:'resume'}});form.submit({preventDefault(){},submitter:{value:'resume'}});
+ if(fail){await wait(()=>!error.hidden);assert.equal(statePos,1);assert.equal(primary.textContent,'Resume import');const before=calls.length;form.submit({preventDefault(){},submitter:{value:'resume'}});await wait(()=>status.textContent==='Imported'&&!primary.disabled);assert.equal(calls[before][0],'server_start');assert.equal(calls[before+1][1],'1');}
+ else await wait(()=>status.textContent==='Imported'&&!primary.disabled);
+ assert.equal(primary.textContent,'Import again');assert.equal(primary.value,'restart');assert.equal(count.textContent,1);assert.equal(list.children[0].textContent,'<img src=x onerror=alert(1)>.png','unmatched filenames are displayed as text');assert.match(summary.textContent,/2 recipes updated/);
+ if(!fail)assert.equal(calls.filter(x=>x[0]==='server_start').length,1,'one click starts and completes the sequence');
+ console.log('PASS server-folder browser logic:',fail?'interruption and resume':'one-click import and duplicate-click protection');
+}
+(async()=>{await scenario(false);await scenario(true);})().catch(e=>{console.error(e);process.exit(1)});

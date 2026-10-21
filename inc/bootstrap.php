@@ -129,15 +129,29 @@ function kitchen_name(): string { return (string)setting('kitchen_name', 'Kitche
 function run_migrations(): array
 {
     $steps = require ROOT . '/inc/migrations.php';
-    $have = (int)setting('schema_version', '1');
-    $ran = [];
-    foreach ($steps as $n => $sqls) {
-        if ($n <= $have) continue;
-        foreach ($sqls as $sql) db()->exec($sql);
-        set_setting('schema_version', (string)$n);
-        $ran[] = $n;
+    // One upgrade at a time: after an update, the first page and its pictures arrive together.
+    $locked = (int)db()->query("SELECT GET_LOCK('mustr_recipes_migrate', 20)")->fetchColumn() === 1;
+    try {
+        // Read the version fresh (not from the settings cache): another request may have just upgraded.
+        $have = (int)(db()->query("SELECT v FROM settings WHERE k = 'schema_version'")->fetchColumn() ?: 1);
+        $ran = [];
+        foreach ($steps as $n => $sqls) {
+            if ($n <= $have) continue;
+            foreach ($sqls as $sql) {
+                try {
+                    db()->exec($sql);
+                } catch (PDOException $ex) {
+                    // Already done (table, column or index exists): safe to carry on.
+                    if (!in_array((int)($ex->errorInfo[1] ?? 0), [1050, 1060, 1061], true)) throw $ex;
+                }
+            }
+            set_setting('schema_version', (string)$n);
+            $ran[] = $n;
+        }
+        return $ran;
+    } finally {
+        if ($locked) db()->query("SELECT RELEASE_LOCK('mustr_recipes_migrate')");
     }
-    return $ran;
 }
 function schema_target(): int { return (int)max(array_keys(require ROOT . '/inc/migrations.php')); }
 
@@ -314,8 +328,8 @@ function delete_upload(?string $name): void
 function delete_upload_if_unused(?string $name): void
 {
     if (!$name) return;
-    $st = db()->prepare('SELECT (SELECT COUNT(*) FROM recipes WHERE image = ?) + (SELECT COUNT(*) FROM ingredients WHERE image = ?) + (SELECT COUNT(*) FROM steps WHERE image = ?)');
-    $st->execute([$name, $name, $name]);
+    $st = db()->prepare('SELECT (SELECT COUNT(*) FROM recipes WHERE image = ?) + (SELECT COUNT(*) FROM ingredients WHERE image = ?) + (SELECT COUNT(*) FROM steps WHERE image = ?) + (SELECT COUNT(*) FROM label_items WHERE image = ?)');
+    $st->execute([$name, $name, $name, $name]);
     if (!(int)$st->fetchColumn()) delete_upload($name);
 }
 
@@ -387,6 +401,14 @@ function label_config(): array
         'show_allergens' => setting('label_allergens', '1') === '1',
         'ask_initials' => setting('label_initials', '1') === '1',
     ];
+}
+
+/** "Pickled red cabbage" → "PRC": a stand-in on the tablet for items with no photo yet. */
+function label_initials(string $name): string
+{
+    $words = preg_split('/[^\p{L}\p{N}]+/u', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $words = array_values(array_filter($words, fn($w) => !in_array(strtolower($w), ['and', 'of', 'the', 'with', 'in'], true)));
+    return mb_strtoupper(implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice($words, 0, 3))) ?: '?');
 }
 
 /** "3 days", "2 hours" */

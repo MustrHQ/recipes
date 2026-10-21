@@ -73,10 +73,11 @@ function install_demo(PDO $pdo): void
     }
 
     // Label items: the bowl itself, and the prepped things the team labels during the day.
-    $li = $pdo->prepare('INSERT INTO label_items (brand_id, recipe_id, name, kind, shelf_value, shelf_unit, storage, allergens, ask_supplier, sort) VALUES (?,?,?,?,?,?,?,?,?,?)');
-    $li->execute([$brand, $ids['D01'] ?? null, 'Chicken katsu rice bowl', 'made', 1, 'days', 'Chilled 0–5 °C', '', 0, 1]);
-    $li->execute([$brand, null, 'Cooked sushi rice', 'made', 2, 'hours', 'Hot-held above 63 °C', '', 0, 2]);
-    $li->execute([$brand, null, 'Katsu sauce', 'made', 3, 'days', 'Chilled 0–5 °C', 'gluten,celery,soya', 0, 3]);
-    $li->execute([$brand, null, 'Pickled red cabbage', 'opened', 5, 'days', 'Chilled once opened', 'sulphites', 1, 4]);
-    $li->execute([$brand, null, 'Breaded chicken thigh', 'defrosted', 2, 'days', 'Chilled 0–5 °C', 'gluten,eggs', 0, 5]);
+    // Each has a photo so the team can find it on the tablet; the recipe-linked one uses the recipe's.
+    $li = $pdo->prepare('INSERT INTO label_items (brand_id, recipe_id, name, kind, shelf_value, shelf_unit, storage, allergens, image, ask_supplier, sort) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+    $li->execute([$brand, $ids['D01'] ?? null, 'Chicken katsu rice bowl', 'made', 1, 'days', 'Chilled 0–5 °C', '', null, 0, 1]);
+    $li->execute([$brand, null, 'Cooked sushi rice', 'made', 2, 'hours', 'Hot-held above 63 °C', '', $photo('d01-ing-2'), 0, 2]);
+    $li->execute([$brand, null, 'Katsu sauce', 'made', 3, 'days', 'Chilled 0–5 °C', 'gluten,celery,soya', $photo('d01-ing-3'), 0, 3]);
+    $li->execute([$brand, null, 'Pickled red cabbage', 'opened', 5, 'days', 'Chilled once opened', 'sulphites', $photo('d01-ing-4'), 1, 4]);
+    $li->execute([$brand, null, 'Breaded chicken thigh', 'defrosted', 2, 'days', 'Chilled 0–5 °C', 'gluten,eggs', $photo('d01-ing-1'), 0, 5]);
 }

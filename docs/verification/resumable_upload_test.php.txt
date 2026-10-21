@@ -1,0 +1,27 @@
+<?php
+require $argv[1].'/inc/upload.php';
+$dir=sys_get_temp_dir().'/mustr-upload-test-'.bin2hex(random_bytes(5));mkdir($dir);
+function check($ok,$text){if(!$ok)throw new RuntimeException($text);echo 'PASS '.$text."\n";}
+function rejects(callable $fn,int $code,string $text){try{$fn();}catch(PackUploadException $e){check($e->getCode()===$code,$text);return;}throw new RuntimeException('Expected rejection: '.$text);}
+$owner='test-owner';$id='1234567890abcdef';$meta=['name'=>'images.zip','file_size'=>10,'chunk_size'=>4,'total'=>3,'images_only'=>true];
+try{
+ $r=pack_upload_chunk($dir,$id,$owner,$meta,0,'abcd');check($r['next_index']===1&&$r['received_bytes']===4,'commits first chunk and receipt');
+ pack_upload_chunk($dir,$id,$owner,$meta,0,'abcd');check(file_get_contents($dir.'/import-'.$id.'.part')==='abcd','lost-response retry does not append first chunk twice');
+ rejects(fn()=>pack_upload_chunk($dir,$id,$owner,$meta,0,'WXYZ'),409,'rejects altered contents on repeated chunk');
+ rejects(fn()=>pack_upload_chunk($dir,$id,$owner,$meta,2,'ij'),409,'rejects out-of-order parts');
+ rejects(fn()=>pack_upload_status($dir,$id,'wrong-owner'),410,'saved progress belongs to the signed-in browser session');
+ $changed=$meta;$changed['images_only']=false;rejects(fn()=>pack_upload_chunk($dir,$id,$owner,$changed,1,'efgh'),409,'rejects changed file metadata or import mode');
+ file_put_contents($dir.'/import-'.$id.'.part','UNCOMMITTED-TAIL',FILE_APPEND);
+ pack_upload_chunk($dir,$id,$owner,$meta,1,'efgh');check(file_get_contents($dir.'/import-'.$id.'.part')==='abcdefgh','truncates an interrupted uncommitted write before retry');
+ $r=pack_upload_status($dir,$id,$owner);check($r['next_index']===2&&$r['received_bytes']===8,'resume reads saved server progress');
+ rejects(fn()=>pack_upload_chunk($dir,$id,$owner,$meta,2,'i'),408,'incomplete network chunk is retryable');
+ $r=pack_upload_chunk($dir,$id,$owner,$meta,2,'ij');check($r['done']&&file_get_contents($dir.'/import-'.$id.'.zip')==='abcdefghij','finishes exact source bytes once');
+ $r=pack_upload_chunk($dir,$id,$owner,$meta,2,'ij');check($r['done']&&filesize($dir.'/import-'.$id.'.zip')===10,'lost final response can be retried without changing the finished file');
+ $paths=pack_upload_paths($dir,$id);$state=json_decode(file_get_contents($paths['state']),true);$state['done']=false;pack_upload_save($paths,$state);
+ $r=pack_upload_chunk($dir,$id,$owner,$meta,2,'ij');check($r['done'],'recovers interruption after rename before final receipt');
+ unlink($dir.'/import-'.$id.'.zip');rejects(fn()=>pack_upload_status($dir,$id,$owner),410,'already imported or removed upload expires cleanly');
+ $id2='abcdef1234567890';$one=['name'=>'single.zip','file_size'=>4,'chunk_size'=>4,'total'=>1,'images_only'=>true];mkdir($dir.'/import-'.$id2.'.zip');
+ rejects(fn()=>pack_upload_chunk($dir,$id2,$owner,$one,0,'data'),500,'failed final rename keeps committed progress for retry');rmdir($dir.'/import-'.$id2.'.zip');
+ $r=pack_upload_status($dir,$id2,$owner);check($r['done']&&file_get_contents($dir.'/import-'.$id2.'.zip')==='data','status request completes interrupted finalization');
+ $invalid=$meta;$invalid['total']=5;rejects(fn()=>pack_upload_chunk($dir,'aaaa1111bbbb2222',$owner,$invalid,0,'abcd'),400,'validates total size against chunk count');
+}finally{foreach(glob($dir.'/*')as$f){if(is_dir($f))rmdir($f);else unlink($f);}rmdir($dir);}
